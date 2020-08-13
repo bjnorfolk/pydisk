@@ -11,7 +11,7 @@ pydisk offers (or will offer) the following functionalities:
 ## Installation:
 
 ```
-git clone https://github.com/cpinte/pydisk.git
+git clone https://github.com/bjnorfolk/pydisk.git
 cd pydisk
 python3 setup.py install
 ```
