@@ -68,27 +68,29 @@ def Wm2_to_Tb(nuFnu, nu, pixelscale):
 
     return Tb
 
-def miriad2txt(fitsfile,freq):
+def miriad2txt(vis, freq, out=None):
 	'''
 	Converts miriad uvfits exported from the fits function to a .txt file
-
-
+	Freq [GHz]
 	'''
-
+	if freq is None:
+		raise ValueError('A observing frequency is required to scale the raw uvfits')
+	
 	freq_factor = freq*10**9
 
 	#Reading in the fits file
 	uv_fits = Table.read(fitsfile)
 
-	#Converting to uvplot friendly format
+	#Converting to a riendly format
 	U = uv_fits['UU']*freq_factor
 	V = uv_fits['VV']*freq_factor
 	DATA = uv_fits['DATA']
 
-
+	#Setting empty arrays for loop
 	Re = []
 	Img = []
 	weight = []
+	#Extracting the Re, Img, and weight variables from the DATA
 	for i in range(len(DATA)):
 
 		data = DATA[i,0,0,:,0,:] 
@@ -102,13 +104,13 @@ def miriad2txt(fitsfile,freq):
 		weight.append(np.ma.sum(data[:,2]))
 
 
-
+	#Constructing uv data table
 	uv_data = Table([U, V, Re, Img, weight], names=['u', 'v', 'Re', 'Im', 'weights'])
 
-	if (target):
-		ascii.write(uv_data, 'vis_files/'+target+'_uv_atcadata.txt', overwrite=True)
+	if out:
+		ascii.write(uv_data, out, overwrite=True)
 	else:
-		ascii.write(uv_data, 'vis_files/target_uv_atcadata.txt', overwrite=True)
+		ascii.write(uv_data, 'miriad_uvdata.txt', overwrite=True)
 
 	return(uv_data)
 
