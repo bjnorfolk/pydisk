@@ -79,7 +79,7 @@ def miriad2txt(vis, freq, out=None):
 	freq_factor = freq*10**9
 
 	#Reading in the fits file
-	uv_fits = Table.read(fitsfile)
+	uv_fits = Table.read(vis)
 
 	#Converting to a riendly format
 	U = uv_fits['UU']*freq_factor
@@ -111,6 +111,55 @@ def miriad2txt(vis, freq, out=None):
 		ascii.write(uv_data, out, overwrite=True)
 	else:
 		ascii.write(uv_data, 'miriad_uvdata.txt', overwrite=True)
+
+	return(uv_data)
+
+def alma2txt(vis,freq,out=None):
+	'''
+	Converts casa uvfits exported from the exportuvfits function to a .txt file
+	Freq [GHz]
+	'''
+	if freq is None:
+		raise ValueError('A observing frequency is required to scale the raw uvfits')
+	
+	freq_factor = freq*10**9
+
+	#Reading in the fits file
+	uv_fits = Table.read(vis)
+
+	#Converting to a friendly format
+	U = uv_fits['UU']*freq_factor
+	V = uv_fits['VV']*freq_factor
+	DATA = uv_fits['DATA']
+
+	#Setting empty arrays for loop
+	Re = []
+	Img = []
+	weight = []
+	u = []
+	v = []
+	#Extracting the u, v, Re, Img, and weight variables from the DATA
+	for i in range(len(DATA)):
+
+		data = DATA[i,0,0,0,0,:,:] 
+		mask = data[:,2]>0
+
+		if (mask).any():
+			data = data[mask]
+
+		if np.ma.sum(data[:,2])>0:
+			Re.append(np.ma.average(data[:,0], weights=data[:,2],axis=0))
+			Img.append(np.ma.average(data[:,1], weights=data[:,2],axis=0))
+			weight.append(np.ma.sum(data[:,2]))
+			u.append(U[i])
+			v.append(V[i])
+
+	uv_data = Table([u, v, Re, Img, weight], names=['u', 'v', 'Re', 'Im', 'weights'])
+
+	if out:
+		ascii.write(uv_data, out, overwrite=True)
+	else:
+		ascii.write(uv_data, 'casa_uvdata.txt', overwrite=True)
 
 	return(uv_data)
 
