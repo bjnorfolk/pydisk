@@ -4,6 +4,8 @@ pydisk is a python package that contains all the useful code I've had to develop
 
 pydisk offers (or will offer) the following functionalities:
 
+ - tools for converting both casa and miriad uvfit outputs to readable txt files
+ - a chi squared minimization tool to find the best phase centre shifts for a disk with a cavity
  - plot disk continuum maps using image fits
  - and much more ...
 
