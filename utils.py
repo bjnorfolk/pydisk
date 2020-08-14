@@ -163,5 +163,54 @@ def alma2txt(vis,freq,out=None):
 
 	return(uv_data)
 
+def vis_shift_min(vis, Rmax=200.0, dtheta=0.01, xlim=None):
+	'''
+	Chi squared minimization to find the dRA and dDec offsets
+	N [arcseconds], physical area in the sky to iterate over
+	dtheta [arcsec], resolution
+	xlim [klambda], restricts the maximum baseline in the minimization
+	'''
+	#reading in vis file
+	uv_data = Table.read(vis, format='ascii')
+	u=uv_data['u']
+	v=uv_data['v']
+	real=uv_data['Re']
+	imag=uv_data['Im']
+	amp = np.sqrt(real**2 + imag**2)
+	phase = np.arctan2(imag,real)
+
+	#Masking max baseline
+	if xlim:
+		uvdist = np.sqrt(u**2+v**2)
+		u=u[(uvdist/1e3)<xlim]
+		v=v[(uvdist/1e3)<xlim]
+		imag=imag[(uvdist/1e3)<xlim]
+
+	#Constructing parameter space
+	shift_arcsec = (np.arange(Rmax*1e2) - (Rmax*1e2)/2) * dtheta
+	shift_rad =  (np.pi/180.)*(shift_arcsec/3600.)
+
+	img_scatter=np.zeros(((Rmax*1e2),(Rmax*1e2)))
+
+	for i, step in enumerate(shift_rad):
+		dra = shift_rad[i]
+		for j, step in enumerate(shift_rad):
+			ddec = shift_rad[j]
+			temp_img = amp*np.sin(phase + 2.*np.pi*(u*dra+v*ddec))
+			img_scatter[i,j] = np.std(temp_img)
+
+	min_err = img_scatter.min()
+	minloc = np.where( img_scatter == min_err )
+
+	#Finding best shift
+	dra_best = -shift_arcsec[minloc[0][0]]
+	ddec_best = -shift_arcsec[minloc[1][0]]
+
+	print('RA shift:',dra_best)
+	print('DEC shift:',ddec_best)
+
+	#returns imaginary scatter plot
+	return(img_scatter)
+
 
 
