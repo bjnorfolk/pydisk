@@ -4,5 +4,4 @@ scipy>=0.18.0
 astropy>=4.0
 frank>=1.0
 pip>=20.0.1.1
-pymcfost>=0.0.0
 pydisk>=0.0.0
