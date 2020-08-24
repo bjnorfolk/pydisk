@@ -1,0 +1,10 @@
+Metadata-Version: 1.2
+Name: pydisk
+Version: 0.0.0
+Summary: Python astronomy tools
+Home-page: http://github.com/bjnorfolk/pydisk
+Author: Brodie Norfolk
+License: MIT
+Description: UNKNOWN
+Platform: UNKNOWN
+Requires-Python: >=3

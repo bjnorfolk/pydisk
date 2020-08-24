@@ -1,0 +1,8 @@
+README.md
+setup.py
+pydisk.egg-info/PKG-INFO
+pydisk.egg-info/SOURCES.txt
+pydisk.egg-info/dependency_links.txt
+pydisk.egg-info/not-zip-safe
+pydisk.egg-info/requires.txt
+pydisk.egg-info/top_level.txt
