@@ -1,8 +1,15 @@
+#!/usr/bin/env python
+# coding=utf-8
 from setuptools import setup, find_packages
+
+with open("pydisk/__init__.py", "r") as f:
+      for line in f:
+            if line.startswith('__version__'):
+                  version = line.split('=')[1].strip().strip('"\'')
 
 setup(name='pydisk',
       description='Python astronomy tools',
-      version='0.0.0',
+      version=version,
       url='http://github.com/bjnorfolk/pydisk',
       python_requires='>=3',
       include_package_data=True,
