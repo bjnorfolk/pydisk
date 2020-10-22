@@ -212,5 +212,40 @@ def vis_shift_min(vis, Rmax=200.0, dtheta=0.01, xlim=None):
 	#returns imaginary scatter plot
 	return(img_scatter)
 
+def readfits(filename):
+	'''
+	Reads image FITS data and header.
+	'''
+	#Reading FITS data and header
+	im, he = fits.getdata(filename, header=True)
+	return im,he
+
+def getdeg(stra: str,
+	stdec: str,
+	):
+	"""Converts RA and DEC into angular values
+
+	Parameters
+	----------
+	stra
+		Right accession of the source in hms.
+
+	stdec
+		Declination of the source in dms.
+
+	"""
+	if(len(stra.split(' '))==1):
+		H, M, S = [float(i) for i in stra.split(':')]
+		D, Md, Sd = [float(i) for i in stdec.split(':')]
+	if(len(stra.split(' '))==3):
+		H, M, S = [float(i) for i in stra.split(' ')]
+		D, Md, Sd = [float(i) for i in stdec.split(' ')]
+	targetra_ang = (H*15.) + (M/4.) + (S/240.)
+	ds = 1.
+	if str(D)[0] == '-':
+		ds, D = -1, abs(D)
+	targetdec_ang = ds*(D + (Md/60.) + (Sd/3600.))
+	return targetra_ang,targetdec_ang
+
 
 
