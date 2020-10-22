@@ -122,13 +122,13 @@ class image:
 	return im, x, y
 
 	def plot(self,
+		plot_star: bool = False,
+		plot_beam: bool = True,
 		contours: ndarray = None,
 		stra: str = None,
 		stdec: str = None,
 		shift_map: ndarray = None,
-		plot_star: bool = False,
-		plot_beam: bool = True,
-		ax: Any,
+		ax: ndarray = None,
 		map_kwargs={},
 		contour_kwargs={},
 		colorbar_kwargs={},
