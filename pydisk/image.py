@@ -71,7 +71,7 @@ class image:
 			The y component of the contourmap.
 		"""
 		#reading in fits
-		_read(self)
+		# self._read()
 
 		im = self.im
 		im[np.isnan(im)]=0.
@@ -196,10 +196,10 @@ class image:
 		else:
 			fig = ax.figure
 
-		_read(self)
+		# self._read[self]
 
 		#produce contour map from fits file
-		contmap, x, y = contour_map(self) #test
+		contmap, x, y = self.contour_map() #test
 
 		ax.contourf(x, y, contmap, rasterized=True, **map_kwargs)
 
