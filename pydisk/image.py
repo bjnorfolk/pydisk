@@ -25,10 +25,10 @@ class image:
 	something something ... good example
 	"""
 
-	def __init__(self, filename=None):
+	def __init__(self, filename=None, **kwargs):
 		#Read FITS image file
 		self.filename = filename
-		self._read()
+		self._read(**kwargs)
 
 	def _read(self):
 		"""Load image FITS file.
@@ -46,11 +46,11 @@ class image:
 		#Read image FITS
 		self.im, self.he = readfits(file_path)
 
-	def _contour_map(self,
+	def contour_map(self,
 		stra: str = None,
 		stdec: str = None,
 		):
-		"""Makes contour map.
+		"""Makes a contour map.
 
 		Parameters
 		----------
@@ -75,7 +75,7 @@ class image:
 
 		im = self.im
 		im[np.isnan(im)]=0.
-		im=np.squeeze(im)
+		contmap=np.squeeze(im)
 
 
 		he = self.he
@@ -124,7 +124,7 @@ class image:
 			yr = yr[0:im.shape[0]]
 			print('yr array corrected')
 
-		return im, x, y
+		return contmap, x, y
 
 	def plot(self,
 		plot_star: bool = False,
@@ -189,17 +189,19 @@ class image:
 		Put good example here.
 		"""
 
-		show_colorbar = kwargs.pop('show_colorbar', kind == 'image')
+		show_colorbar = kwargs.pop('show_colorbar', 'True')
 
 		if ax is None:
 			fig, ax = plt.subplots()
 		else:
 			fig = ax.figure
 
-		#read fits file in
-		_contour_map(self)
+		_read(self)
 
-		ax.contourf(x, y, im, rasterized=True, **map_kwargs)
+		#produce contour map from fits file
+		contmap, x, y = contour_map(self) #test
+
+		ax.contourf(x, y, contmap, rasterized=True, **map_kwargs)
 
 		if contours:
 			_kwargs = copy(contour_kwargs)
