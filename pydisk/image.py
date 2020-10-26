@@ -25,8 +25,9 @@ class image:
 	something something ... good example
 	"""
 
-	def __init__(self):
+	def __init__(self, filename=None):
 		#Read FITS image file
+		self.filename = filename
 		self._read()
 
 	def _read(self):
@@ -38,9 +39,9 @@ class image:
 			The path to the file.
 		"""
 		# Set file_path
-		file_path = Path(filename).expanduser()
+		file_path = Path(self.filename).expanduser()
 		if not file_path.is_file():
-			raise FileNotFoundError('Cannot fine image FITS')
+			raise FileNotFoundError('Cannot find image FITS')
 		
 		#Read image FITS
 		self.im, self.he = readfits(file_path)
