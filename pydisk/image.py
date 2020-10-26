@@ -4,6 +4,10 @@ The Image class contains all tools necessary to read and plot fits image files.
 """
 
 import numpy as np
+from numpy import ndarray
+
+import matplotlib.pyplot as plt
+from matplotlib.patches import Ellipse
 
 from .utils import readfits, getdeg
 
@@ -119,7 +123,7 @@ class image:
 			yr = yr[0:im.shape[0]]
 			print('yr array corrected')
 
-	return im, x, y
+		return im, x, y
 
 	def plot(self,
 		plot_star: bool = False,
@@ -135,7 +139,7 @@ class image:
 		star_kwargs={},
 		beam_kwargs={},
 		**kwargs,
-		) -> Any:
+		):
 		"""Plot image as a contour map.
 
 		Parameters
@@ -247,6 +251,8 @@ class image:
 				hatch='////', fc='None',linewidth=lw)
 			ax.add_patch(ell)
 			ax.add_patch(ell1)
+
+		return ax
 
 
 
