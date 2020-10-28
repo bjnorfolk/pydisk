@@ -1,5 +1,8 @@
 import numpy as np
 
+from astropy.io import fits
+
+
 default_cmap = "inferno"
 
 sigma_to_FWHM = 2.0 * np.sqrt(2.0 * np.log(2))
@@ -20,6 +23,12 @@ def Jy_to_Wm2(Fnu, nu):
     nu [Hz]
     '''
     return 1e-26 * Fnu * nu
+
+def DEGTORAD(deg):
+    '''
+    Convert from degrees to radians
+    '''
+    return (deg*np.pi/180.)
 
 def Jybeam_to_Tb(Fnu, nu, bmaj, bmin):
     '''
