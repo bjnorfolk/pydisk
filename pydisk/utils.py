@@ -1,14 +1,17 @@
 import numpy as np
 
 from astropy.io import fits
+from astropy.table import Table
+from astropy.io import ascii
 
+from frank.utilities import UVDataBinner
 
 default_cmap = "inferno"
 
 sigma_to_FWHM = 2.0 * np.sqrt(2.0 * np.log(2))
 FWHM_to_sigma = 1.0 / sigma_to_FWHM
 arcsec = np.pi / 648000
-
+c = 299792458
 
 def Wm2_to_Jy(nuFnu, nu):
     '''
@@ -23,12 +26,6 @@ def Jy_to_Wm2(Fnu, nu):
     nu [Hz]
     '''
     return 1e-26 * Fnu * nu
-
-def DEGTORAD(deg):
-    '''
-    Convert from degrees to radians
-    '''
-    return (deg*np.pi/180.)
 
 def Jybeam_to_Tb(Fnu, nu, bmaj, bmin):
     '''
@@ -79,7 +76,7 @@ def Wm2_to_Tb(nuFnu, nu, pixelscale):
 
 def miriad2txt(vis, freq, out=None):
 	'''
-	Converts miriad uvfits exported from the fits function to a .txt file
+	Converts miriad uvfits exported from the fits function to a .txt ascii file
 	Freq [GHz]
 	'''
 	if freq is None:
@@ -120,55 +117,6 @@ def miriad2txt(vis, freq, out=None):
 		ascii.write(uv_data, out, overwrite=True)
 	else:
 		ascii.write(uv_data, 'miriad_uvdata.txt', overwrite=True)
-
-	return(uv_data)
-
-def alma2txt(vis,freq,out=None):
-	'''
-	Converts casa uvfits exported from the exportuvfits function to a .txt file
-	Freq [GHz]
-	'''
-	if freq is None:
-		raise ValueError('A observing frequency is required to scale the raw uvfits')
-	
-	freq_factor = freq*10**9
-
-	#Reading in the fits file
-	uv_fits = Table.read(vis)
-
-	#Converting to a friendly format
-	U = uv_fits['UU']*freq_factor
-	V = uv_fits['VV']*freq_factor
-	DATA = uv_fits['DATA']
-
-	#Setting empty arrays for loop
-	Re = []
-	Img = []
-	weight = []
-	u = []
-	v = []
-	#Extracting the u, v, Re, Img, and weight variables from the DATA
-	for i in range(len(DATA)):
-
-		data = DATA[i,0,0,0,0,:,:] 
-		mask = data[:,2]>0
-
-		if (mask).any():
-			data = data[mask]
-
-		if np.ma.sum(data[:,2])>0:
-			Re.append(np.ma.average(data[:,0], weights=data[:,2],axis=0))
-			Img.append(np.ma.average(data[:,1], weights=data[:,2],axis=0))
-			weight.append(np.ma.sum(data[:,2]))
-			u.append(U[i])
-			v.append(V[i])
-
-	uv_data = Table([u, v, Re, Img, weight], names=['u', 'v', 'Re', 'Im', 'weights'])
-
-	if out:
-		ascii.write(uv_data, out, overwrite=True)
-	else:
-		ascii.write(uv_data, 'casa_uvdata.txt', overwrite=True)
 
 	return(uv_data)
 
@@ -227,7 +175,31 @@ def readfits(filename):
 	'''
 	#Reading FITS data and header
 	im, he = fits.getdata(filename, header=True)
+
 	return im,he
+
+def readvis(filename):
+	'''
+	Reads visibility data.
+	'''
+	if not filename.endswith(('.txt','.npz')):
+		raise ValueError('Data must be either in a ascii txt file or numpy npz file')
+
+	if filename.endswith('.txt'):
+		uv_data = Table.read(filename, format='ascii')
+		u=uv_data['u']
+		v=uv_data['v']
+		#w=uv_data['w']
+		wgt=np.abs(uv_data['weights'])
+		real=uv_data['Re']
+		imag=uv_data['Im']
+		vis = real + imag * 1j
+		return u, v, vis, wgt
+
+	if filename.endswith('.npz'):
+		dat = np.load(filename)
+		u, v, w, vis, wgt = dat['u'], dat['v'], dat['w'], dat['Vis'], dat['Wgt']
+		return u, v, vis, wgt
 
 def getdeg(stra: str,
 	stdec: str,
@@ -255,6 +227,20 @@ def getdeg(stra: str,
 		ds, D = -1, abs(D)
 	targetdec_ang = ds*(D + (Md/60.) + (Sd/3600.))
 	return targetra_ang,targetdec_ang
+
+def estimate_baseline_dependent_weight(q, V, bin_width):
+   
+	uvBin = UVDataBinner(q, V, np.ones_like(q), bin_width)
+	var = 0.5*(uvBin.error.real**2 + uvBin.error.imag**2) * uvBin.bin_counts
+
+	weights = np.full_like(q, np.nan)
+	left, right = uvBin.bin_edges
+	for i, [l,r] in enumerate(zip(left, right)):
+		idx = (q >= l) & (q < r)
+		weights[idx] = 1/var[i]
+
+	assert np.all(~np.isnan(weights)), "Weights needed for all data points"
+	return weights
 
 
 
