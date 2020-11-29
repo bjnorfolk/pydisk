@@ -14,6 +14,8 @@ from matplotlib.lines import Line2D
 
 from pathlib import Path
 
+from copy import copy
+
 from .utils import estimate_baseline_dependent_weight, readvis
 
 from frank.radial_fitters import FrankFitter
@@ -60,7 +62,7 @@ class vis:
 		PA: float = None,
 		dRA: float = 0.0,
 		dDec: float = 0.0,
-		bins: ndarray = np.array([0]),
+		bin_width: float = 0.0,
 		):
 		"""Bins the visibility data.
 
@@ -100,9 +102,13 @@ class vis:
 		imagp = visp.imag
 		wgt = self.wgt
 
+
+
 		# if requested, return a binned (averaged) representation
-		if (bins.size > 1):
-			avbins = 1e3 * bins       # scale to lambda units (input in klambda)
+		if (bin_width > 0):
+			max_bin=int(np.nanmax(rhop))
+			bins = np.arange(0, max_bin+bin_width*1e3, bin_width*1e3)
+			avbins = bins       # scale to lambda units (input in klambda)
 			bwid = 0.5 * (avbins[1] - avbins[0])
 			bvis = np.zeros_like(avbins, dtype='complex')
 			berr_std = np.zeros_like(avbins, dtype='complex')
@@ -137,7 +143,7 @@ class vis:
 		PA: float = None,
 		dRA: float = 0.0,
 		dDec: float = 0.0,
-		bins: ndarray = np.array([0]),
+		bin_width: float = 0.0,
 		ax: ndarray = None,
 		ax_kwargs={},
 		):
@@ -184,9 +190,10 @@ class vis:
 			fig = ax.figure
 
 		#deproject and bin visibilities
-		vis, rhop, err_std, err_scat, bins = self.binned_vis(inc, PA, dRA, dDec, bins)
+		vis, rhop, err_std, err_scat, bins = self.binned_vis(inc, PA, dRA, dDec, bin_width)
 
 		ax.scatter(rhop/1e3, vis.real, **ax_kwargs)
+		ax.axhline(0, linewidth=1, alpha=1, color="k", ls='--')
 
 		#errors
 		err = np.sqrt(err_std**2+err_scat**2)/2
@@ -371,7 +378,7 @@ class vis:
 		alpha: ndarray = None, 		
 		ws: ndarray = None, 
 		bin_width: float = None, 
-		est_weights: bool =False,
+		est_weights: bool = False,
 		normalise: bool = True,
 		save_model: bool = False,
 		ax: ndarray = None,
@@ -421,7 +428,7 @@ class vis:
 			The matplotlib Axes object.
 		"""
 		
-		_kwargs = copy(ax_kwargs)
+		_kwargs = copy(ax0_kwargs)
 
 		number_of_colors = len(alpha)*len(ws)
 
@@ -462,18 +469,21 @@ class vis:
 
 				log = np.sum((real - vis_model_realbins)**2/real_err)
 
-				lw = _kwargs.pop('lw', 5)
-				ax[0].plot(model_grid/1e3, vis_model, ls='--', lw=lw, zorder=3, color=color[c_counter])
-				ax[1].plot(sol.r, I_nn, zorder=2, color=color[c_counter])
+				lw = _kwargs.pop('lw', 4)
+				ax[0].plot(model_grid/1e3, vis_model, ls='--', lw=lw, zorder=3, color=color[c_counter], alpha=0.5)
+				ax[1].plot(sol.r, I_nn, zorder=2, color=color[c_counter], lw=lw, ls='--', alpha=0.5)
+
 
 				symbols.append(mlines.Line2D([0], [0], color=color[c_counter], linewidth=lw, linestyle='-'))
-				labels.append('alpha ='+str(alpha[a])+' ws ='+str(ws[w])+' chi2 ='+str(log))
+				labels.append('alpha ='+str(alpha[a])+' ws ='+str(ws[w])+' chi2 ='+str(float("{:.3f}".format(log))))
 				c_counter = c_counter+1
-		
+		font = _kwargs.pop('font', 20)
+		s = _kwargs.pop('s', 150)
+		ax[0].axhline(0, linewidth=lw, alpha=1, color="k", ls='--')		
 		ax[0].errorbar(binned_vis.uv/1e3, real, yerr=real_err, ecolor='black', 
 			fmt='none', capsize=0, zorder=1, elinewidth=3, **ax0_kwargs)
-		ax[0].scatter(binned_vis.uv/1e3, real, zorder=2, c='black', **ax0_kwargs)
-		ax[1].legend(handles=symbols, labels=labels, loc='upper right')
+		ax[0].scatter(binned_vis.uv/1e3, real, zorder=1, c='black', s=s, **ax0_kwargs)
+		ax[1].legend(handles=symbols, labels=labels, loc='upper right', fontsize=font)
 		ax[1].plot(**ax1_kwargs)
 
 		return ax[0], ax[1]

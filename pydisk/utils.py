@@ -182,7 +182,7 @@ def readvis(filename):
 	'''
 	Reads visibility data.
 	'''
-	if not filename.endswith(('.txt','.npz')):
+	if not filename.endswith(('.txt','.npz','.dat')):
 		raise ValueError('Data must be either in a ascii txt file or numpy npz file')
 
 	if filename.endswith('.txt'):
@@ -194,11 +194,32 @@ def readvis(filename):
 		real=uv_data['Re']
 		imag=uv_data['Im']
 		vis = real + imag * 1j
+		print('array length: ', len(u))
+		print('Mean Re: ', np.mean(vis.real))
+		print('Mean Imag: ', np.mean(vis.imag))
+		print('Mean weight: ', np.mean(wgt))
+		print('Min weight: ', wgt.min())
 		return u, v, vis, wgt
 
 	if filename.endswith('.npz'):
 		dat = np.load(filename)
 		u, v, w, vis, wgt = dat['u'], dat['v'], dat['w'], dat['Vis'], dat['Wgt']
+		print('array length: ', len(u))
+		print('Mean Re: ', np.mean(vis.real))
+		print('Mean Imag: ', np.mean(vis.imag))
+		print('Mean weight: ', np.mean(wgt))
+		print('Min weight: ', wgt.min())
+		return u, v, vis, wgt
+
+	if filename.endswith('.dat'):
+		uv_data = Table.read(filename, format='ascii')
+		u=uv_data['u']
+		v=uv_data['v']
+		#w=uv_data['w']
+		wgt=uv_data['weights']
+		real=uv_data['real']
+		imag=uv_data['imag']
+		vis = real + imag * 1j
 		return u, v, vis, wgt
 
 def getdeg(stra: str,
@@ -229,7 +250,8 @@ def getdeg(stra: str,
 	return targetra_ang,targetdec_ang
 
 def estimate_baseline_dependent_weight(q, V, bin_width):
-   
+
+	print('Re-weighting')
 	uvBin = UVDataBinner(q, V, np.ones_like(q), bin_width)
 	var = 0.5*(uvBin.error.real**2 + uvBin.error.imag**2) * uvBin.bin_counts
 
