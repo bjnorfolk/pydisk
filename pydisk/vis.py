@@ -63,6 +63,7 @@ class vis:
 		dRA: float = 0.0,
 		dDec: float = 0.0,
 		bin_width: float = 0.0,
+		deproject: bool =True, 
 		):
 		"""Bins the visibility data.
 
@@ -91,8 +92,13 @@ class vis:
 		dDec *= -np.pi / (180 * 3600)
 
 		# change to a deprojected, rotated coordinate system
-		uprime = (self.u * np.cos(PAr) + self.v * np.sin(PAr))
-		vprime = (-self.u * np.sin(PAr) + self.v * np.cos(PAr)) * np.cos(incr)
+		if deproject:
+			uprime = (self.u * np.cos(PAr) + self.v * np.sin(PAr))
+			vprime = (-self.u * np.sin(PAr) + self.v * np.cos(PAr)) * np.cos(incr)
+		else:
+			uprime = self.u
+			vprime = self.v
+			
 		rhop = np.sqrt(uprime**2 + vprime**2)
 
 		#phase shifts to account for offsets
