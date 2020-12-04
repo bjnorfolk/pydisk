@@ -63,7 +63,7 @@ class vis:
 		dRA: float = 0.0,
 		dDec: float = 0.0,
 		bin_width: float = 0.0,
-		deproject: bool =True, 
+		deproject: bool = True, 
 		):
 		"""Bins the visibility data.
 
@@ -98,7 +98,7 @@ class vis:
 		else:
 			uprime = self.u
 			vprime = self.v
-			
+
 		rhop = np.sqrt(uprime**2 + vprime**2)
 
 		#phase shifts to account for offsets
@@ -266,7 +266,7 @@ class vis:
 		disk_geometry = FixedGeometry(float(inc), float(PA), dRA=dRA, dDec=dDec)
 		FF = FrankFitter(Rmax=Rmax, N=N, geometry=disk_geometry, alpha=alpha, weights_smooth=ws)
 		print('Calculating Frankenstin model')
-		sol = FF.fit(self.u, self.v, self.vis, self.wgt)
+		sol = FF.fit(self.u, self.v, self.vis, weights)
 
 		#Deprojecting
 		u_deproj, v_deproj, vis_deproj = sol.geometry.apply_correction(self.u, self.v, self.vis)
@@ -375,7 +375,7 @@ class vis:
 		return ax[0], ax[1]
 
 	def frank_param_explore(self,
-		Rmax: float = 3.0,
+		Rmax: float = 3,
 		N: float = 250,
 		dRA: float = 0.0,
 		dDec: float = 0.0,
@@ -481,7 +481,8 @@ class vis:
 
 
 				symbols.append(mlines.Line2D([0], [0], color=color[c_counter], linewidth=lw, linestyle='-'))
-				labels.append('alpha ='+str(alpha[a])+' ws ='+str(ws[w])+' chi2 ='+str(float("{:.3f}".format(log))))
+				labels.append(r'$\alpha$ ='+str(alpha[a])+' ws ='+str(ws[w])+
+					r' $\chi^2$ ='+str(float("{:.3f}".format(log))))
 				c_counter = c_counter+1
 		font = _kwargs.pop('font', 20)
 		s = _kwargs.pop('s', 150)

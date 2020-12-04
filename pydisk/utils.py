@@ -74,51 +74,25 @@ def Wm2_to_Tb(nuFnu, nu, pixelscale):
 
     return Tb
 
-def miriad2txt(vis, freq, out=None):
-	'''
-	Converts miriad uvfits exported from the fits function to a .txt ascii file
-	Freq [GHz]
-	'''
-	if freq is None:
-		raise ValueError('A observing frequency is required to scale the raw uvfits')
-	
-	freq_factor = freq*10**9
+def uvdump2ascii(vis, out):
+	uvdump_file = Table.read(vis, format='ascii')
+	u = uvdump_file['col1']
+	v = uvdump_file['col2']
+	w = uvdump_file['col3']
+	real = uvdump_file['col4']
+	imag = uvdump_file['col5']
+	wgt = 1/uvdump_file['col6']
+	freq = uvdump_file['col7']
 
-	#Reading in the fits file
-	uv_fits = Table.read(vis)
+	uv_data = Table([u, v, w, real, imag, wgt, freq], 
+		names=['u', 'v', 'w', 'real', 'imag', 'wgt', 'freq'])
 
-	#Converting to a riendly format
-	U = uv_fits['UU']*freq_factor
-	V = uv_fits['VV']*freq_factor
-	DATA = uv_fits['DATA']
+	if not out:
+		raise FileNotFoundError('Need to specify an output file')
 
-	#Setting empty arrays for loop
-	Re = []
-	Img = []
-	weight = []
-	#Extracting the Re, Img, and weight variables from the DATA
-	for i in range(len(DATA)):
+	ascii.write(uv_data, out, overwrite=True)
 
-		data = DATA[i,0,0,:,0,:] 
-		mask = data[:,2]>0
-
-		if (mask).any():
-			data = data[mask]
-
-		Re.append(np.ma.average(data[:,0], weights=data[:,2],axis=0))
-		Img.append(np.ma.average(data[:,1], weights=data[:,2],axis=0))
-		weight.append(np.ma.sum(data[:,2]))
-
-
-	#Constructing uv data table
-	uv_data = Table([U, V, Re, Img, weight], names=['u', 'v', 'Re', 'Im', 'weights'])
-
-	if out:
-		ascii.write(uv_data, out, overwrite=True)
-	else:
-		ascii.write(uv_data, 'miriad_uvdata.txt', overwrite=True)
-
-	return(uv_data)
+	return uv_data
 
 def vis_shift_min(vis, Rmax=200.0, dtheta=0.01, xlim=None):
 	'''
@@ -189,10 +163,10 @@ def readvis(filename):
 		uv_data = Table.read(filename, format='ascii')
 		u=uv_data['u']
 		v=uv_data['v']
-		#w=uv_data['w']
-		wgt=np.abs(uv_data['weights'])
-		real=uv_data['Re']
-		imag=uv_data['Im']
+		w=uv_data['w']
+		wgt=uv_data['wgt']
+		real=uv_data['real']
+		imag=uv_data['imag']
 		vis = real + imag * 1j
 		print('array length: ', len(u))
 		print('Mean Re: ', np.mean(vis.real))
@@ -263,6 +237,4 @@ def estimate_baseline_dependent_weight(q, V, bin_width):
 
 	assert np.all(~np.isnan(weights)), "Weights needed for all data points"
 	return weights
-
-
 
