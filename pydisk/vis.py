@@ -475,14 +475,18 @@ class vis:
 
 				log = np.sum((real - vis_model_realbins)**2/real_err)
 
+				if not log:
+					print('Model failed, increase Rmax or maybe N')
+					log=1e3
+
 				lw = _kwargs.pop('lw', 4)
 				ax[0].plot(model_grid/1e3, vis_model, ls='--', lw=lw, zorder=3, color=color[c_counter], alpha=0.5)
 				ax[1].plot(sol.r, I_nn, zorder=2, color=color[c_counter], lw=lw, ls='--', alpha=0.5)
 
 
 				symbols.append(mlines.Line2D([0], [0], color=color[c_counter], linewidth=lw, linestyle='-'))
-				labels.append(r'$\alpha$ ='+str(alpha[a])+' ws ='+str(ws[w])+
-					r' $\chi^2$ ='+str(float("{:.3f}".format(log))))
+				labels.append(r'$\alpha$ ='+str(alpha[a])+' ws ='+str(ws[w])+r' $\chi^2$ ='+str(float("{:.3f}".format(log))))
+				
 				c_counter = c_counter+1
 		font = _kwargs.pop('font', 20)
 		s = _kwargs.pop('s', 150)

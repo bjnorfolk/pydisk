@@ -163,26 +163,26 @@ def readvis(filename):
 		uv_data = Table.read(filename, format='ascii')
 		u=uv_data['u']
 		v=uv_data['v']
-		w=uv_data['w']
+		#w=uv_data['w']
 		wgt=uv_data['wgt']
 		real=uv_data['real']
 		imag=uv_data['imag']
 		vis = real + imag * 1j
-		print('array length: ', len(u))
-		print('Mean Re: ', np.mean(vis.real))
-		print('Mean Imag: ', np.mean(vis.imag))
-		print('Mean weight: ', np.mean(wgt))
-		print('Min weight: ', wgt.min())
+		# print('array length: ', len(u))
+		# print('Mean Re: ', np.mean(vis.real))
+		# print('Mean Imag: ', np.mean(vis.imag))
+		# print('Mean weight: ', np.mean(wgt))
+		# print('Min weight: ', wgt.min())
 		return u, v, vis, wgt
 
 	if filename.endswith('.npz'):
 		dat = np.load(filename)
 		u, v, w, vis, wgt = dat['u'], dat['v'], dat['w'], dat['Vis'], dat['Wgt']
-		print('array length: ', len(u))
-		print('Mean Re: ', np.mean(vis.real))
-		print('Mean Imag: ', np.mean(vis.imag))
-		print('Mean weight: ', np.mean(wgt))
-		print('Min weight: ', wgt.min())
+		# print('array length: ', len(u))
+		# print('Mean Re: ', np.mean(vis.real))
+		# print('Mean Imag: ', np.mean(vis.imag))
+		# print('Mean weight: ', np.mean(wgt))
+		# print('Min weight: ', wgt.min())
 		return u, v, vis, wgt
 
 	if filename.endswith('.dat'):
