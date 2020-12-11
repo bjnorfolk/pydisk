@@ -94,7 +94,7 @@ def uvdump2ascii(vis, out):
 
 	return uv_data
 
-def vis_shift_min(vis, Rmax=200.0, dtheta=0.01, xlim=None):
+def vis_shift_min(filename, Rmax=2, dtheta=0.01, xlim=None):
 	'''
 	Chi squared minimization to find the dRA and dDec offsets
 	N [arcseconds], physical area in the sky to iterate over
@@ -102,11 +102,9 @@ def vis_shift_min(vis, Rmax=200.0, dtheta=0.01, xlim=None):
 	xlim [klambda], restricts the maximum baseline in the minimization
 	'''
 	#reading in vis file
-	uv_data = Table.read(vis, format='ascii')
-	u=uv_data['u']
-	v=uv_data['v']
-	real=uv_data['Re']
-	imag=uv_data['Im']
+	u, v, vis, wgt = readvis(filename)
+	real=vis.real
+	imag=vis.imag
 	amp = np.sqrt(real**2 + imag**2)
 	phase = np.arctan2(imag,real)
 
@@ -115,17 +113,20 @@ def vis_shift_min(vis, Rmax=200.0, dtheta=0.01, xlim=None):
 		uvdist = np.sqrt(u**2+v**2)
 		u=u[(uvdist/1e3)<xlim]
 		v=v[(uvdist/1e3)<xlim]
+		real=real[(uvdist/1e3)<xlim]
 		imag=imag[(uvdist/1e3)<xlim]
+		amp = np.sqrt(real**2 + imag**2)
+		phase = np.arctan2(imag,real)
 
 	#Constructing parameter space
 	shift_arcsec = (np.arange(Rmax*1e2) - (Rmax*1e2)/2) * dtheta
 	shift_rad =  (np.pi/180.)*(shift_arcsec/3600.)
 
-	img_scatter=np.zeros(((Rmax*1e2),(Rmax*1e2)))
+	img_scatter=np.zeros((int(Rmax*1e2),int(Rmax*1e2)))
 
-	for i, step in enumerate(shift_rad):
+	for i in range(0,len(shift_rad)):
 		dra = shift_rad[i]
-		for j, step in enumerate(shift_rad):
+		for j in range(0,len(shift_rad)):
 			ddec = shift_rad[j]
 			temp_img = amp*np.sin(phase + 2.*np.pi*(u*dra+v*ddec))
 			img_scatter[i,j] = np.std(temp_img)

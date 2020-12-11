@@ -354,11 +354,14 @@ class vis:
 		vis_model = sol.predict_deprojected(model_grid, I=I_nn).real
 
 		if normalise:
-			real = (binned_vis.V.real/abs(binned_vis.V.real[0]))
-			real_err = (binned_vis.error.real/abs(binned_vis.V.real[0]))
-			img = (binned_vis.V.imag/abs(binned_vis.V.real[0]))
-			img_err = (binned_vis.error.imag/abs(binned_vis.V.real[0]))
-			vis_model *= 1/abs(binned_vis.V.real[0])
+			real_data = binned_vis.V.real.data
+			factor = real_data[~np.isnan(real_data)].max()
+			print('Normalising factor', factor)
+			real = binned_vis.V.real/factor
+			real_err = binned_vis.error.real/factor
+			img = binned_vis.V.imag/factor
+			img_err = binned_vis.error.imag/factor
+			vis_model *= 1/factor
 			I_nn *= 1/max(np.abs(I_nn))
 		else:
 			real = binned_vis.V.real
@@ -366,11 +369,13 @@ class vis:
 			img = binned_vis.V.imag
 			img_err = binned_vis.error.imag
 
-		ax[0].plot(model_grid/1e3, vis_model, ls='-', zorder=3, **ax0_kwargs)
+		
+		ax[0].plot(model_grid/1e3, vis_model, ls='-', lw=4, zorder=3, c='purple', **ax0_kwargs)
+		ax[0].axhline(0, linewidth=4, alpha=1, color="k", ls='--')	
 		ax[0].errorbar(binned_vis.uv/1e3, real, yerr=real_err, ecolor='black', 
 			fmt='none', capsize=0, zorder=1, elinewidth=3, **ax0_kwargs)
-		ax[0].scatter(binned_vis.uv/1e3, real, zorder=2, **ax0_kwargs)
-		ax[1].plot(sol.r, I_nn, zorder=2, **ax1_kwargs)
+		ax[0].scatter(binned_vis.uv/1e3, real, s=150, zorder=2, **ax0_kwargs)
+		ax[1].plot(sol.r, I_nn, lw=4, c='purple', zorder=2, **ax1_kwargs)
 
 		return ax[0], ax[1]
 
@@ -460,12 +465,14 @@ class vis:
 				vis_model_realbins = sol.predict_deprojected(binned_vis.uv, I=I_nn).real
 
 				if normalise:
-					real = (binned_vis.V.real/abs(binned_vis.V.real[0]))
-					real_err = (binned_vis.error.real/abs(binned_vis.V.real[0]))
-					img = (binned_vis.V.imag/abs(binned_vis.V.real[0]))
-					img_err = (binned_vis.error.imag/abs(binned_vis.V.real[0]))
-					vis_model *= 1/abs(binned_vis.V.real[0])
-					vis_model_realbins *= 1/abs(binned_vis.V.real[0])
+					real_data = binned_vis.V.real.data
+					factor = real_data[~np.isnan(real_data)].max()
+					print('Normalising factor', factor)
+					real = binned_vis.V.real/factor
+					real_err = binned_vis.error.real/factor
+					img = binned_vis.V.imag/factor
+					img_err = binned_vis.error.imag/factor
+					vis_model *= 1/factor
 					I_nn *= 1/max(np.abs(I_nn))
 				else:
 					real = binned_vis.V.real
