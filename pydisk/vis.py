@@ -2,6 +2,7 @@
 
 The Frank_Plotter class contains all tools necessary to read, model, and plot visibilities.
 """
+import os
 
 import numpy as np
 from numpy import ndarray
@@ -22,6 +23,7 @@ from frank.radial_fitters import FrankFitter
 from frank.geometry import FitGeometryGaussian, FixedGeometry
 from frank.fit import load_data
 from frank.utilities import UVDataBinner
+from frank.utilities import draw_bootstrap_sample
 
 class vis:
 	"""Visibility data object.
@@ -293,9 +295,11 @@ class vis:
 		est_weights: bool = False,
 		normalise: bool = True,
 		save_model: bool = False,
+		imaginary: bool = False,
 		ax: ndarray = None,
 		ax0_kwargs={},
 		ax1_kwargs={},
+		ax2_kwargs={},
 		kwargs={},
 		):
 		"""Plots Frankenstin models.
@@ -344,6 +348,9 @@ class vis:
 			fig, ax = plt.subplots()
 		# else:
 		# 	fig = ax.figure
+		_kwargs0 = copy(ax0_kwargs)
+
+		_kwargs1 = copy(ax2_kwargs)
 
 		binned_vis, sol, model_grid = self.frank_model(Rmax=Rmax, N=N, dRA=dRA, dDec=dDec,
 			inc=inc, PA=PA, alpha=alpha, ws=ws, bin_width=bin_width, est_weights=est_weights,
@@ -356,7 +363,7 @@ class vis:
 		if normalise:
 			real_data = binned_vis.V.real.data
 			factor = real_data[~np.isnan(real_data)].max()
-			print('Normalising factor', factor)
+			print('kl 0 value: ', factor)
 			real = binned_vis.V.real/factor
 			real_err = binned_vis.error.real/factor
 			img = binned_vis.V.imag/factor
@@ -369,15 +376,64 @@ class vis:
 			img = binned_vis.V.imag
 			img_err = binned_vis.error.imag
 
-		
-		ax[0].plot(model_grid/1e3, vis_model, ls='-', lw=4, zorder=3, c='purple', **ax0_kwargs)
-		ax[0].axhline(0, linewidth=4, alpha=1, color="k", ls='--')	
-		ax[0].errorbar(binned_vis.uv/1e3, real, yerr=real_err, ecolor='black', 
-			fmt='none', capsize=0, zorder=1, elinewidth=3, **ax0_kwargs)
-		ax[0].scatter(binned_vis.uv/1e3, real, s=150, zorder=2, **ax0_kwargs)
-		ax[1].plot(sol.r, I_nn, lw=4, c='purple', zorder=2, **ax1_kwargs)
+		if imaginary:
+			lw = _kwargs0.pop('lw', 4)
+			ls = _kwargs0.pop('ls', '-')	
+			c = _kwargs0.pop('c', 'black')
+			s = _kwargs0.pop('s', 150)
 
-		return ax[0], ax[1]
+			ax0_kwargs.pop('lw', None)
+			ax0_kwargs.pop('ls', None)
+			ax0_kwargs.pop('c', None)
+			ax0_kwargs.pop('s', None)
+
+			ax[0].axhline(0, linewidth=lw, alpha=1, color="k", ls='--')	
+			ax[0].errorbar(binned_vis.uv/1e3, real, yerr=real_err, ecolor='black', 
+				fmt='none', capsize=0, zorder=1, elinewidth=3, **ax0_kwargs)
+			ax[0].scatter(binned_vis.uv/1e3, real, s=s, c=c, zorder=2, **ax0_kwargs)
+
+			ax[1].axhline(0, linewidth=lw, alpha=1, color="k", ls='--')	
+			ax[1].errorbar(binned_vis.uv/1e3, img, yerr=img_err, ecolor='black', 
+				fmt='none', capsize=0, zorder=1, elinewidth=3, **ax1_kwargs)
+			ax[1].scatter(binned_vis.uv/1e3, img, s=s, c=c, zorder=2, **ax1_kwargs)
+
+			c = _kwargs1.pop('c', 'purple')
+			ax[0].plot(model_grid/1e3, vis_model, ls=ls, lw=lw, zorder=3, c=c, **ax0_kwargs)
+
+			lw = _kwargs1.pop('lw', 4)
+			ls = _kwargs1.pop('ls', '-')
+			ax2_kwargs.pop('lw', None)
+			ax2_kwargs.pop('ls', None)
+			ax2_kwargs.pop('c', None)
+			ax[2].plot(sol.r, I_nn, lw=lw, ls=ls, c=c, zorder=2, **ax2_kwargs)
+			return ax[0], ax[1], ax[2]
+		else:
+			lw = _kwargs0.pop('lw', 4)
+			ls = _kwargs0.pop('ls', '-')	
+			c = _kwargs0.pop('c', 'black')
+			s = _kwargs0.pop('s', 150)
+
+			ax0_kwargs.pop('lw', None)
+			ax0_kwargs.pop('ls', None)
+			ax0_kwargs.pop('c', None)
+			ax0_kwargs.pop('s', None)
+
+			ax[0].axhline(0, linewidth=lw, alpha=1, color="k", ls='--')	
+			ax[0].errorbar(binned_vis.uv/1e3, real, yerr=real_err, ecolor='black', 
+				fmt='none', capsize=0, zorder=1, elinewidth=3, **ax0_kwargs)
+			ax[0].scatter(binned_vis.uv/1e3, real, s=s, c=c, zorder=2, **ax0_kwargs)
+
+			c = _kwargs1.pop('c', 'purple')
+			ax[0].plot(model_grid/1e3, vis_model, ls=ls, lw=lw, zorder=3, c=c, **ax0_kwargs)
+
+			lw = _kwargs1.pop('lw', 4)
+			ls = _kwargs1.pop('ls', '-')
+			ax2_kwargs.pop('lw', None)
+			ax2_kwargs.pop('ls', None)
+			ax2_kwargs.pop('c', None)
+
+			ax[1].plot(sol.r, I_nn, lw=lw, ls=ls, c=c, zorder=2, **ax2_kwargs)
+			return ax[0], ax[1]
 
 	def frank_param_explore(self,
 		Rmax: float = 3,
@@ -505,5 +561,214 @@ class vis:
 		ax[1].plot(**ax1_kwargs)
 
 		return ax[0], ax[1]
+
+	def frank_bootstrap(self,
+		iters: int = 100,
+		Rmax: float = 3.0,
+		N: float = 300,
+		dRA: float = 0.0,
+		dDec: float = 0.0,
+		inc: float = None,
+		PA: float = None,
+		alpha: ndarray = None, 		
+		ws: ndarray = None, 
+		bin_width: float = None, 
+		est_weights: bool = False,
+		save_model: bool = False,
+		source: str = None,
+		):
+		"""Calculates Frankenstein models.
+
+		Parameters
+		----------
+		R
+
+		N
+
+		dRA
+			Right accession offsets in arcseconds.
+		dDec
+			Declination offsets in arcseconds.
+		inc:
+			Inclination of the disc in degrees.
+		PA:
+			Position angle of the disc in degrees.
+		alpha
+
+		ws
+
+		bin_width
+			Spacing for binnings the visibilities
+		est_weights
+
+		save_model
+
+
+		Returns
+		-------
+		binned_vis
+
+		sol
+
+		model_grid
+		"""
+
+		#Calculating intitial model
+		if est_weights == True:
+			baselines = (self.u**2 + self.v**2)**.5
+			weights = estimate_baseline_dependent_weight(baselines, self.vis, bin_width)
+		else:
+			weights = self.wgt
+
+		disk_geometry = FixedGeometry(float(inc), float(PA), dRA=dRA, dDec=dDec)
+		FF = FrankFitter(Rmax=Rmax, N=N, geometry=disk_geometry, alpha=alpha, weights_smooth=ws)
+
+		print('Calculating initial Frankenstin model')
+		sol = FF.fit(self.u, self.v, self.vis, weights)
+		I_nn = sol.solve_non_negative()
+
+		model_peak = sol.r[I_nn == I_nn.max()]
+
+		#bootstrap
+		peak_pos_boot = []
+		bootstrap_vis_model = []
+		bootstrap_bp_model = []
+		bootstrap_vis_modelgrid = []
+		bootstrap_bp_model_grid = []
+		modelmean_diff = []
+
+
+
+		print('Bootstrap model: ')
+		for i in range(0,iters):
+			print(i)
+
+			u_boot, v_boot, vis_boot, wgt_boot = draw_bootstrap_sample(self.u, self.v, self.vis, weights)
+			try:
+				sol_boot = FF.fit(u_boot, v_boot, vis_boot, wgt_boot)
+			except ValueError:
+				continue
+
+			#Deprojecting
+			u_deproj, v_deproj, vis_deproj = sol_boot.geometry.apply_correction(u_boot, v_boot, vis_boot)
+			baselines = (u_deproj**2 + v_deproj**2)**.5
+
+			#Model grid
+			model_grid_boot = np.logspace(np.log10(min(baselines.min(), sol_boot.q[0])), np.log10(max(baselines.max(), sol_boot.q[-1])), 10**4)
+
+			I_nn_boot = sol_boot.solve_non_negative()
+
+			vis_model_boot = sol_boot.predict_deprojected(model_grid_boot, I=I_nn_boot).real
+
+			#Visibilities
+			binned_vis = UVDataBinner(baselines, vis_deproj, wgt_boot, bin_width)
+
+
+			peak_pos_boot.append(sol_boot.r[I_nn_boot == I_nn_boot.max()])
+
+			bootstrap_bp_model.append(I_nn_boot)
+			bootstrap_bp_model_grid.append(sol_boot.r)
+			bootstrap_vis_model.append(vis_model_boot)
+			bootstrap_vis_modelgrid.append(model_grid_boot)
+			modelmean_diff.append(np.abs(I_nn_boot-I_nn))
+
+		idx = np.argsort(np.mean(modelmean_diff, 1))
+		bootstrap_bp_model = np.asarray(bootstrap_bp_model)
+		bootstrap_bp_model = bootstrap_bp_model[idx]
+
+		bootstrap_bp_model_grid = np.asarray(bootstrap_bp_model_grid)
+		bootstrap_bp_model_grid = bootstrap_bp_model_grid[idx]
+
+		bootstrap_vis_model = np.asarray(bootstrap_vis_model)
+		bootstrap_vis_model = bootstrap_vis_model[idx_alma]
+
+		bootstrap_vis_modelgrid = np.asarray(bootstrap_vis_modelgrid)
+		bootstrap_vis_modelgrid = bootstrap_vis_modelgrid[idx_alma]
+
+		if not os.path.isdir('bootstrap_models'):
+			os.makedirs('bootstrap_models')
+
+		if not source:
+			print('WARNING bootstrap model is saved under a generic name and may be overwritten')
+			source = 'frank'
+
+		np.save('bootstrap_models/'+str(source)+'_bootstrap_bp_'+str(iters)+'_models', bootstrap_bp_model)
+		np.save('bootstrap_models/'+str(source)+'_bootstrap_vis_'+str(iters)+'_models', bootstrap_vis_model)
+
+		np.save('bootstrap_models/'+str(source)+'_bootstrap_bp_'+str(iters)+'_model_grid', bootstrap_bp_model_grid)
+		np.save('bootstrap_models/'+str(source)+'_bootstrap_vis_'+str(iters)+'_model_grid', bootstrap_vis_modelgrid)
+
+		model_peak_std = np.std(peak_pos_boot)
+		string = str(source) + ' model peak: '+ str(model_peak) + ', STD: ' + str(model_peak_std)
+
+		return string
+
+	def frank_bootstrap_plot(
+		source: str = 'frank',
+		iters: int = 100,
+		percentile: float = 0.68,
+		ax: ndarray = None,
+		ax_kwargs = {},
+		):
+
+		_kwargs = copy(ax_kwargs)
+
+		if ax is None:
+			fig, ax = plt.subplots()
+
+		bootstrap_bp_models = np.load('bootstrap_models/'+str(source)+'_bootstrap_bp_'+str(iters)+'_models')
+		bootstrap_bp_models = bootstrap_bp_models[0:int(percentile*len(bootstrap_bp_models))]
+
+		bootstrap_vis_models = np.load('bootstrap_models/'+str(source)+'_bootstrap_vis_'+str(iters)+'_models')
+		bootstrap_vis_models = bootstrap_vis_models[0:int(percentile*len(bootstrap_vis_models))]
+
+		model_grid = np.load('bootstrap_models/'+str(source)+'_bootstrap_vis_'+str(iters)+'_model_grid')
+		model_grid = model_grid[0:int(percentile*len(model_grid))]
+
+		brightness_grid = np.load('bootstrap_models/'+str(source)+'_bootstrap_bp_'+str(iters)+'_model_grid')
+		brightness_grid = brightness_grid[0:int(percentile*len(brightness_grid))]
+
+		for bootstrap in range(0,len(bootstrap_bp_models)):
+			# ax[c].fill_between(model_grid_atca/1e3, vis_model_atca, bootstrap_models_vis_plot_atca[bootstrap], alpha = 0.5, color='lightskyblue', lw=5, zorder = -1, rasterized=True)
+			# ax[c+1].fill_between(sol_atca.r, fit_i_atca, bootstrap_models_bp_plot_atca[bootstrap], alpha =0.5, color='lightskyblue', lw=5, zorder = -1, rasterized=True)
+			lw = _kwargs.pop('lw', 4)
+			ls = _kwargs.pop('ls', '-')	
+			c = _kwargs.pop('c', 'purple')
+			alpha = _kwargs.pop('alpha', 0.5)
+
+			ax[0].plot(model_grid[bootstrap]/1e3, bootstrap_vis_models[bootstrap], color=c, lw=lw, alpha = alpha, ls=ls, zorder=-1, rasterized=True)
+			ax[1].plot(brightness_grid[bootstrap], bootstrap_bp_models[bootstrap], color=c, lw=lw, alpha = alpha, ls=ls, zorder = -1, rasterized=True)
+
+		ax[0].set_rasterization_zorder(0)
+		ax[1].set_rasterization_zorder(0)
+
+		return ax[0], ax[1]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 

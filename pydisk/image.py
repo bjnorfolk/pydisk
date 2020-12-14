@@ -242,6 +242,9 @@ class image:
 	def plot_map(self,
 		plot_star: bool = False,
 		plot_beam: bool = True,
+		contour_overlay: str = None,
+		overlay_dRA: float = 0.0,
+		overlay_dDec: float = 0.0,
 		contours: ndarray = None,
 		dRA: float = 0.0,
 		dDec: float = 0.0,
@@ -315,11 +318,48 @@ class image:
 
 		contf = ax.contourf(x, y, contmap*10**3, levels=1000, cmap=cmap, zorder= 1, **map_kwargs)
 
-		if contours:
-			_kwargs = copy(contour_kwargs)
-			alpha = _kwargs.pop('alpha', 0.7)
-			color = _kwargs.pop('color', 'w')
-			lw = _kwargs.pop('linewidth', 1)
+		if contour_overlay:
+			im, he = readfits(contour_overlay)
+
+			nx, ny = he['NAXIS1'], he['NAXIS2']
+
+			xr = 3600 * he['CDELT1'] * (np.arange(nx) - (he['CRPIX1'] - 1)) - overlay_dRA
+			yr = 3600 * he['CDELT2'] * (np.arange(ny) - (he['CRPIX2'] - 1)) - overlay_dDec
+
+			if (xr.shape[0]!=contmap.shape[1]):
+				xr = xr[0:contmap.shape[1]]
+				print('xr array corrected')
+			if (yr.shape[0]!=contmap.shape[0]):
+				yr = yr[0:contmap.shape[0]]
+				print('yr array corrected')
+
+			x, y = np.meshgrid(xr,yr)
+
+			rr = np.sqrt(x**2+y**2)
+
+			#Reshaping if x!=y
+			if (rr.shape!=contmap.shape):
+				rr = rr[0:contmap.shape[0],0:contmap.shape[1]]
+
+			#Ideally the map is larger than the source ... this may be bad
+			radius = 0.5*rr.max()
+
+			w = np.where(rr>radius)
+			rms = np.std(contmap[w])
+
+
+			contour_array = np.array(contours)
+			contours_neg = -1*contour_array
+			levels = np.sort(np.append(contours_neg,contour_array))*rms
+			ax.contour(x_contour,y_contour,contmap_contour,levels, alpha=alpha, linewidths=lw, 
+				colors=color, zorder=2)
+
+		else:
+			if contours:
+				_kwargs = copy(contour_kwargs)
+				alpha = _kwargs.pop('alpha', 0.7)
+				color = _kwargs.pop('color', 'w')
+				lw = _kwargs.pop('linewidth', 1)
 
 			contour_array = np.array(contours)
 			contours_neg = -1*contour_array
