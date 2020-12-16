@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Ellipse
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from matplotlib.ticker import FormatStrFormatter
+import cmasher as cmr
 
 from scipy import interpolate
 
@@ -301,8 +302,9 @@ class image:
 		--------
 		Put good example here.
 		"""
+		__kwargs = copy(kwargs)
 
-		show_colorbar = kwargs.pop('show_colorbar', 'True')
+		show_colorbar = __kwargs.pop('show_colorbar', 'True')
 
 		if ax is None:
 			fig, ax = plt.subplots()
@@ -314,12 +316,14 @@ class image:
 
 		he = self.he
 		_kwargs = copy(map_kwargs)
-		cmap = _kwargs.pop('cmap', 'viridis')
+		cmap = _kwargs.pop('cmap', cmr.heat)
 
-		contf = ax.contourf(x, y, contmap*10**3, levels=1000, cmap=cmap, zorder= 1, **map_kwargs)
+		contf = ax.contourf(x, y, contmap*10**3, levels=1000, cmap=cmap, zorder= 1)
 
 		if contour_overlay:
 			im, he = readfits(contour_overlay)
+			im[np.isnan(im)]=0.
+			contmap=np.squeeze(im)
 
 			nx, ny = he['NAXIS1'], he['NAXIS2']
 
@@ -347,15 +351,19 @@ class image:
 			w = np.where(rr>radius)
 			rms = np.std(contmap[w])
 
+			_kwargs = copy(contour_kwargs)
+			alpha = _kwargs.pop('alpha', 0.7)
+			color = _kwargs.pop('color', 'w')
+			lw = _kwargs.pop('linewidth', 1)
 
 			contour_array = np.array(contours)
 			contours_neg = -1*contour_array
 			levels = np.sort(np.append(contours_neg,contour_array))*rms
-			ax.contour(x_contour,y_contour,contmap_contour,levels, alpha=alpha, linewidths=lw, 
+			ax.contour(x,y,contmap,levels, alpha=alpha, linewidths=lw, 
 				colors=color, zorder=2)
 
 		else:
-			if contours:
+			if np.array(contours).any():
 				_kwargs = copy(contour_kwargs)
 				alpha = _kwargs.pop('alpha', 0.7)
 				color = _kwargs.pop('color', 'w')
@@ -388,8 +396,8 @@ class image:
 			else:
 				cbar.ax.yaxis.set_major_formatter(FormatStrFormatter('%.2f'))
 
-			fontsize = kwargs.pop('cbar_fontsize', '12')
-			fontweight = kwargs.pop('cbar_fontweight', 'bold')
+			fontsize = __kwargs.pop('cbar_fontsize', '12')
+			fontweight = __kwargs.pop('cbar_fontweight', 'bold')
 			cbar.set_label(label, fontsize=fontsize, fontweight=fontweight)
 
 		if plot_star:
@@ -407,6 +415,7 @@ class image:
 			bmpa=90.-he['BPA']
 			bmj = he['BMAJ']
 			bmn = he['BMIN']
+			print('Beam dim: bmj=',bmj,', bmn=',bmn,', pa=', he['BPA'])
 			_kwargs = copy(beam_kwargs)
 			lw = _kwargs.pop('linewidth', '2')
 			clr = _kwargs.pop('edgecolor', 'w')

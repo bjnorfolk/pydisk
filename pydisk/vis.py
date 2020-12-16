@@ -680,10 +680,10 @@ class vis:
 		bootstrap_bp_model_grid = bootstrap_bp_model_grid[idx]
 
 		bootstrap_vis_model = np.asarray(bootstrap_vis_model)
-		bootstrap_vis_model = bootstrap_vis_model[idx_alma]
+		bootstrap_vis_model = bootstrap_vis_model[idx]
 
 		bootstrap_vis_modelgrid = np.asarray(bootstrap_vis_modelgrid)
-		bootstrap_vis_modelgrid = bootstrap_vis_modelgrid[idx_alma]
+		bootstrap_vis_modelgrid = bootstrap_vis_modelgrid[idx]
 
 		if not os.path.isdir('bootstrap_models'):
 			os.makedirs('bootstrap_models')
