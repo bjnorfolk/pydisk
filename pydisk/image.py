@@ -352,7 +352,7 @@ class image:
 			rms = np.std(contmap[w])
 
 			_kwargs = copy(contour_kwargs)
-			alpha = _kwargs.pop('alpha', 0.7)
+			alpha = _kwargs.pop('alpha', 1)
 			color = _kwargs.pop('color', 'w')
 			lw = _kwargs.pop('linewidth', 1)
 
@@ -365,7 +365,7 @@ class image:
 		else:
 			if np.array(contours).any():
 				_kwargs = copy(contour_kwargs)
-				alpha = _kwargs.pop('alpha', 0.7)
+				alpha = _kwargs.pop('alpha', 1)
 				color = _kwargs.pop('color', 'w')
 				lw = _kwargs.pop('linewidth', 1)
 
@@ -415,7 +415,7 @@ class image:
 			bmpa=90.-he['BPA']
 			bmj = he['BMAJ']
 			bmn = he['BMIN']
-			print('Beam dim: bmj=',bmj,', bmn=',bmn,', pa=', he['BPA'])
+			print('Beam dim: bmj=',bmj/0.000277778,'deg, bmn=',bmn/0.000277778,'deg, pa=', he['BPA'],' deg')
 			_kwargs = copy(beam_kwargs)
 			lw = _kwargs.pop('linewidth', '2')
 			clr = _kwargs.pop('edgecolor', 'w')

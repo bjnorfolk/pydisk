@@ -38,9 +38,10 @@ class vis:
 	something something ... good example
 	"""
 
-	def __init__(self, filename=None, **kwargs):
+	def __init__(self, filename=None, wle=None, **kwargs):
 		#Read visibility data
 		self.filename = filename
+		self.wle = wle
 		self._read(**kwargs)
 
 	def _read(self):
@@ -54,10 +55,10 @@ class vis:
 		# Set file_path
 		file_path = Path(self.filename).expanduser()
 		if not file_path.is_file():
-			raise FileNotFoundError('Cannot find image FITS')
+			raise FileNotFoundError('Cannot find visibility data file')
 		
-		#Read image FITS
-		self.u, self.v, self.vis, self.wgt = readvis(str(file_path))
+		#Read visibilitiy data
+		self.u, self.v, self.vis, self.wgt = readvis(filename=str(file_path), wle=self.wle)
 
 	def binned_vis(self,
 		inc: float = None,
@@ -362,14 +363,16 @@ class vis:
 
 		if normalise:
 			real_data = binned_vis.V.real.data
-			factor = real_data[~np.isnan(real_data)].max()
-			print('kl 0 value: ', factor)
-			real = binned_vis.V.real/factor
-			real_err = binned_vis.error.real/factor
-			img = binned_vis.V.imag/factor
-			img_err = binned_vis.error.imag/factor
-			vis_model *= 1/factor
+			factor = real_data[~np.isnan(real_data)]
+			factor = factor[factor != 0]
+			print('kl0 value: ', factor[0])
+			real = binned_vis.V.real/factor[0]
+			real_err = binned_vis.error.real/factor[0]
+			img = binned_vis.V.imag/factor[0]
+			img_err = binned_vis.error.imag/factor[0]
+			vis_model *= 1/factor[0]
 			I_nn *= 1/max(np.abs(I_nn))
+			self.kl0 = factor[0]
 		else:
 			real = binned_vis.V.real
 			real_err = binned_vis.error.real
@@ -495,7 +498,7 @@ class vis:
 			The matplotlib Axes object.
 		"""
 		
-		_kwargs = copy(ax0_kwargs)
+		ax0_kwargs = copy(ax0_kwargs)
 
 		number_of_colors = len(alpha)*len(ws)
 
@@ -522,14 +525,16 @@ class vis:
 
 				if normalise:
 					real_data = binned_vis.V.real.data
-					factor = real_data[~np.isnan(real_data)].max()
-					print('Normalising factor', factor)
-					real = binned_vis.V.real/factor
-					real_err = binned_vis.error.real/factor
-					img = binned_vis.V.imag/factor
-					img_err = binned_vis.error.imag/factor
-					vis_model *= 1/factor
+					factor = real_data[~np.isnan(real_data)]
+					factor = factor[factor != 0]
+					print('kl0 value: ', factor[0])
+					real = binned_vis.V.real/factor[0]
+					real_err = binned_vis.error.real/factor[0]
+					img = binned_vis.V.imag/factor[0]
+					img_err = binned_vis.error.imag/factor[0]
+					vis_model *= 1/factor[0]
 					I_nn *= 1/max(np.abs(I_nn))
+					self.kl0 = factor[0]
 				else:
 					real = binned_vis.V.real
 					real_err = binned_vis.error.real
@@ -542,7 +547,7 @@ class vis:
 					print('Model failed, increase Rmax or maybe N')
 					log=1e3
 
-				lw = _kwargs.pop('lw', 4)
+				lw = ax0_kwargs.pop('lw', 4)
 				ax[0].plot(model_grid/1e3, vis_model, ls='--', lw=lw, zorder=3, color=color[c_counter], alpha=0.5)
 				ax[1].plot(sol.r, I_nn, zorder=2, color=color[c_counter], lw=lw, ls='--', alpha=0.5)
 
@@ -551,8 +556,9 @@ class vis:
 				labels.append(r'$\alpha$ ='+str(alpha[a])+' ws ='+str(ws[w])+r' $\chi^2$ ='+str(float("{:.3f}".format(log))))
 				
 				c_counter = c_counter+1
-		font = _kwargs.pop('font', 20)
-		s = _kwargs.pop('s', 150)
+		font = ax0_kwargs.pop('font', 20)
+		s = ax0_kwargs.pop('s', 150)
+		ax0_kwargs.pop('s', None)
 		ax[0].axhline(0, linewidth=lw, alpha=1, color="k", ls='--')		
 		ax[0].errorbar(binned_vis.uv/1e3, real, yerr=real_err, ecolor='black', 
 			fmt='none', capsize=0, zorder=1, elinewidth=3, **ax0_kwargs)
@@ -692,6 +698,7 @@ class vis:
 			print('WARNING bootstrap model is saved under a generic name and may be overwritten')
 			source = 'frank'
 
+		print(str(source))
 		np.save('bootstrap_models/'+str(source)+'_bootstrap_bp_'+str(iters)+'_models', bootstrap_bp_model)
 		np.save('bootstrap_models/'+str(source)+'_bootstrap_vis_'+str(iters)+'_models', bootstrap_vis_model)
 
@@ -701,48 +708,9 @@ class vis:
 		model_peak_std = np.std(peak_pos_boot)
 		string = str(source) + ' model peak: '+ str(model_peak) + ', STD: ' + str(model_peak_std)
 
+		print(string)
+
 		return string
-
-	def frank_bootstrap_plot(
-		source: str = 'frank',
-		iters: int = 100,
-		percentile: float = 0.68,
-		ax: ndarray = None,
-		ax_kwargs = {},
-		):
-
-		_kwargs = copy(ax_kwargs)
-
-		if ax is None:
-			fig, ax = plt.subplots()
-
-		bootstrap_bp_models = np.load('bootstrap_models/'+str(source)+'_bootstrap_bp_'+str(iters)+'_models')
-		bootstrap_bp_models = bootstrap_bp_models[0:int(percentile*len(bootstrap_bp_models))]
-
-		bootstrap_vis_models = np.load('bootstrap_models/'+str(source)+'_bootstrap_vis_'+str(iters)+'_models')
-		bootstrap_vis_models = bootstrap_vis_models[0:int(percentile*len(bootstrap_vis_models))]
-
-		model_grid = np.load('bootstrap_models/'+str(source)+'_bootstrap_vis_'+str(iters)+'_model_grid')
-		model_grid = model_grid[0:int(percentile*len(model_grid))]
-
-		brightness_grid = np.load('bootstrap_models/'+str(source)+'_bootstrap_bp_'+str(iters)+'_model_grid')
-		brightness_grid = brightness_grid[0:int(percentile*len(brightness_grid))]
-
-		for bootstrap in range(0,len(bootstrap_bp_models)):
-			# ax[c].fill_between(model_grid_atca/1e3, vis_model_atca, bootstrap_models_vis_plot_atca[bootstrap], alpha = 0.5, color='lightskyblue', lw=5, zorder = -1, rasterized=True)
-			# ax[c+1].fill_between(sol_atca.r, fit_i_atca, bootstrap_models_bp_plot_atca[bootstrap], alpha =0.5, color='lightskyblue', lw=5, zorder = -1, rasterized=True)
-			lw = _kwargs.pop('lw', 4)
-			ls = _kwargs.pop('ls', '-')	
-			c = _kwargs.pop('c', 'purple')
-			alpha = _kwargs.pop('alpha', 0.5)
-
-			ax[0].plot(model_grid[bootstrap]/1e3, bootstrap_vis_models[bootstrap], color=c, lw=lw, alpha = alpha, ls=ls, zorder=-1, rasterized=True)
-			ax[1].plot(brightness_grid[bootstrap], bootstrap_bp_models[bootstrap], color=c, lw=lw, alpha = alpha, ls=ls, zorder = -1, rasterized=True)
-
-		ax[0].set_rasterization_zorder(0)
-		ax[1].set_rasterization_zorder(0)
-
-		return ax[0], ax[1]
 
 
 

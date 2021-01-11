@@ -153,7 +153,7 @@ def readfits(filename):
 
 	return im,he
 
-def readvis(filename):
+def readvis(filename, wle=None):
 	'''
 	Reads visibility data.
 	'''
@@ -161,19 +161,30 @@ def readvis(filename):
 		raise ValueError('Data must be either in a ascii txt file or numpy npz file')
 
 	if filename.endswith('.txt'):
-		uv_data = Table.read(filename, format='ascii')
-		u=uv_data['u']
-		v=uv_data['v']
-		#w=uv_data['w']
-		wgt=uv_data['wgt']
-		real=uv_data['real']
-		imag=uv_data['imag']
-		vis = real + imag * 1j
-		# print('array length: ', len(u))
-		# print('Mean Re: ', np.mean(vis.real))
-		# print('Mean Imag: ', np.mean(vis.imag))
-		# print('Mean weight: ', np.mean(wgt))
-		# print('Min weight: ', wgt.min())
+		if wle:
+			uv_data = Table.read(filename, format='ascii')
+			u=uv_data['col1']/wle
+			v=uv_data['col2']/wle
+			#w=uv_data['w']
+			wgt=uv_data['col5']
+			real=uv_data['col3']
+			imag=uv_data['col4']
+			vis = real + imag * 1j			
+		else:
+			uv_data = Table.read(filename, format='ascii')
+			u=uv_data['u']
+			v=uv_data['v']
+			#w=uv_data['w']
+			wgt=uv_data['wgt']
+			real=uv_data['real']
+			imag=uv_data['imag']
+			vis = real + imag * 1j
+			# print('array length: ', len(u))
+			# print('Mean Re: ', np.mean(vis.real))
+			# print('Mean Imag: ', np.mean(vis.imag))
+			# print('Mean weight: ', np.mean(wgt))
+			# print('Min weight: ', wgt.min())
+		
 		return u, v, vis, wgt
 
 	if filename.endswith('.npz'):
@@ -238,4 +249,12 @@ def estimate_baseline_dependent_weight(q, V, bin_width):
 
 	assert np.all(~np.isnan(weights)), "Weights needed for all data points"
 	return weights
+
+def fwhm_calc(bmaj,dist,re_au=None):
+	sigma = np.sqrt(-bmaj**2/(2*np.log(0.003)))
+	fwhm = 2.355*sigma
+	print('fwhm error: ', 0.5*fwhm,'arcseconds - ',0.5*fwhm*dist,' AU')
+	if re_au:
+		return 0.5*fwhm*dist
+
 
