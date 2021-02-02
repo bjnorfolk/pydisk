@@ -74,8 +74,12 @@ def Wm2_to_Tb(nuFnu, nu, pixelscale):
 
     return Tb
 
-def uvdump2ascii(vis, out):
-	uvdump_file = Table.read(vis, format='ascii')
+def uvdump2ascii(vis_fil, out):
+	"""Converts a visibility data set exported from uvdump in miriad to an ascii file.
+		vis, visibility txt file
+		out, visibility acsii txt file
+		"""
+	uvdump_file = Table.read(vis_file, format='ascii')
 	u = uvdump_file['col1']
 	v = uvdump_file['col2']
 	w = uvdump_file['col3']
@@ -102,9 +106,9 @@ def vis_shift_min(filename, Rmax=2, dtheta=0.01, xlim=None):
 	xlim [klambda], restricts the maximum baseline in the minimization
 	'''
 	#reading in vis file
-	u, v, vis, wgt = readvis(filename)
-	real=vis.real
-	imag=vis.imag
+	u, v, visp, wgt = readvis(filename)
+	real=visp.real
+	imag=visp.imag
 	amp = np.sqrt(real**2 + imag**2)
 	phase = np.arctan2(imag,real)
 
@@ -169,7 +173,7 @@ def readvis(filename, wle=None):
 			wgt=uv_data['col5']
 			real=uv_data['col3']
 			imag=uv_data['col4']
-			vis = real + imag * 1j			
+			visp = real + imag * 1j			
 		else:
 			uv_data = Table.read(filename, format='ascii')
 			u=uv_data['u']
@@ -178,24 +182,19 @@ def readvis(filename, wle=None):
 			wgt=uv_data['wgt']
 			real=uv_data['real']
 			imag=uv_data['imag']
-			vis = real + imag * 1j
-			# print('array length: ', len(u))
-			# print('Mean Re: ', np.mean(vis.real))
-			# print('Mean Imag: ', np.mean(vis.imag))
-			# print('Mean weight: ', np.mean(wgt))
-			# print('Min weight: ', wgt.min())
+			visp = real + imag * 1j
 		
-		return u, v, vis, wgt
+		return u, v, visp, wgt
 
 	if filename.endswith('.npz'):
 		dat = np.load(filename)
-		u, v, w, vis, wgt = dat['u'], dat['v'], dat['w'], dat['Vis'], dat['Wgt']
+		u, v, w, visp, wgt = dat['u'], dat['v'], dat['w'], dat['Vis'], dat['Wgt']
 		# print('array length: ', len(u))
 		# print('Mean Re: ', np.mean(vis.real))
 		# print('Mean Imag: ', np.mean(vis.imag))
 		# print('Mean weight: ', np.mean(wgt))
 		# print('Min weight: ', wgt.min())
-		return u, v, vis, wgt
+		return u, v, visp, wgt
 
 	if filename.endswith('.dat'):
 		uv_data = Table.read(filename, format='ascii')
@@ -205,8 +204,41 @@ def readvis(filename, wle=None):
 		wgt=uv_data['weights']
 		real=uv_data['real']
 		imag=uv_data['imag']
-		vis = real + imag * 1j
-		return u, v, vis, wgt
+		visp = real + imag * 1j
+		return u, v, visp, wgt
+
+def import_galario_model(filename, wle, bin_width):
+
+	u, v, visp, wgt = readvis(filename, wle)
+	
+	rhop = np.sqrt(u**2 + v**2)
+
+	realp = visp.real
+	imagp = visp.imag
+	# if requested, return a binned (averaged) representation
+	if (bin_width > 0):
+		max_bin=int(np.nanmax(rhop))
+		bins = np.arange(0, max_bin+bin_width, bin_width)
+		avbins = bins       # scale to lambda units (input in klambda)
+		bwid = 0.5 * (avbins[1] - avbins[0])
+		bvis = np.zeros_like(avbins, dtype='complex')
+
+		for ib in np.arange(len(avbins)):
+			inb = np.where((rhop >= avbins[ib] - bwid) & (rhop < avbins[ib] + bwid))
+			if (len(inb[0]) >= 5):
+				bRe= np.average(realp[inb])
+				bIm= np.average(imagp[inb])
+				bvis[ib] = bRe + 1j*bIm
+			else:
+				bvis[ib] = 0 + 1j*0
+
+		parser = np.where(bvis.real != 0)
+		output =  avbins[parser], bvis[parser]
+
+		return output
+
+	output = rhop, visp
+	return output
 
 def getdeg(stra: str,
 	stdec: str,

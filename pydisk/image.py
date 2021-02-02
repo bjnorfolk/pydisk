@@ -172,7 +172,7 @@ class image:
 
 		# radius and azimuth bin centers (and their widths)
 		if not rbins:
-			rbins = np.linspace(0.005, 1.5, 300)	# in arcseconds
+			rbins = np.linspace(0.0005, 1.5, 3000)	# in arcseconds
 		if not tbins:
 			tbins = np.linspace(-180, 180, 181)     # in degrees
 
@@ -440,10 +440,12 @@ class image:
 		PA: float = None,
 		dRA: float = 0.0,
 		dDec: float = 0.0,
+		sr: bool = False,
 		rbins: ndarray = None,
 		tbins: ndarray = None,
 		ax: ndarray = None,
 		ax_kwargs={},
+		beam_kwargs={},
 		kwargs={},
 		):
 		"""Plot image as a contour map.
@@ -497,13 +499,31 @@ class image:
 		#produce contour map from fits file
 		rbins, SBr, err_SBr, rtmap = self.radial_profile(inc, PA, dRA, dDec, rbins, tbins)
 
-		ax.plot(rbins, SBr, **ax_kwargs)
-		plt.fill_between(rbins, SBr-err_SBr, SBr+err_SBr, alpha=0.5, **ax_kwargs)
+		# SBr = SBr*4.25e10
+		bmj = 3600 *self.he['BMAJ']
+		bmn = 3600 *self.he['BMIN']
+
+		beam_area = (np.pi * bmj * bmn/ (4 * np.log(2))) / (3600 * 180 / np.pi)**2
+		SBr_0 = SBr / (beam_area * (3600 * 180 / np.pi)**2)
+		err_SBr_0 = err_SBr / (beam_area * (3600 * 180 / np.pi)**2)
+
+		rbins = rbins[SBr_0>0]
+		err_SBr_0 = err_SBr_0[SBr_0>0]
+		SBr_0 = SBr_0[SBr_0>0]
+		if sr:
+			SBr_0 = SBr_0*4.25e10
+			err_SBr_0 = err_SBr_0*4.25e10
+
+		ax.scatter(rbins, SBr_0, **ax_kwargs)
+		ax.errorbar(rbins, SBr_0, yerr=err_SBr_0, ecolor='black', 
+			fmt='none', capsize=0, zorder=1, elinewidth=1)
+
+		#plt.fill_between(rbins, SBr_0-err_SBr_0, SBr_0+err_SBr_0, alpha=0.5, **ax_kwargs)
 
 		if plot_beam:
-			bmpa=90.-he['BPA']
-			bmj = he['BMAJ']
-			bmn = he['BMIN']
+			bmpa=90.-self.he['BPA']
+			bmj = self.he['BMAJ']
+			bmn = self.he['BMIN']
 			_kwargs = copy(beam_kwargs)
 			lw = _kwargs.pop('linewidth', '2')
 			clr = _kwargs.pop('edgecolor', 'w')

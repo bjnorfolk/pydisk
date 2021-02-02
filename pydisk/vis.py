@@ -12,12 +12,13 @@ import random
 import matplotlib.pyplot as plt
 import matplotlib.lines as mlines
 from matplotlib.lines import Line2D
+from matplotlib.gridspec import GridSpec
 
 from pathlib import Path
 
 from copy import copy
 
-from .utils import estimate_baseline_dependent_weight, readvis
+from .utils import estimate_baseline_dependent_weight, readvis, import_galario_model
 
 from frank.radial_fitters import FrankFitter
 from frank.geometry import FitGeometryGaussian, FixedGeometry
@@ -51,6 +52,8 @@ class vis:
 		----------
 		filename
 			The path to the file.
+		wle
+			The wavlength if the uv plane is in units of meters.
 		"""
 		# Set file_path
 		file_path = Path(self.filename).expanduser()
@@ -58,7 +61,7 @@ class vis:
 			raise FileNotFoundError('Cannot find visibility data file')
 		
 		#Read visibilitiy data
-		self.u, self.v, self.vis, self.wgt = readvis(filename=str(file_path), wle=self.wle)
+		self.u, self.v, self.visp, self.wgt = readvis(filename=str(file_path), wle=self.wle)
 
 	def binned_vis(self,
 		inc: float = None,
@@ -67,6 +70,7 @@ class vis:
 		dDec: float = 0.0,
 		bin_width: float = 0.0,
 		deproject: bool = True, 
+		est_weights: bool = False,
 		):
 		"""Bins the visibility data.
 
@@ -81,10 +85,20 @@ class vis:
 		dDec
 			Declination offsets in arcseconds.
 		bins
-			Spacing for binnings the visibilities
+			Spacing for binnings the visibilities in lambda.
+		deproject
+			Set to True to deproject the visibilities.
 
 		Returns
 		-------
+		vis_p
+			Binned real and imaginary components of the visibilities.
+		rho_p
+			Deproject binned baselines.
+		err_std
+			Standard deviation of the visibilities.
+		err_scat
+			Scatter error.
 
 
 		"""
@@ -106,17 +120,20 @@ class vis:
 
 		#phase shifts to account for offsets
 		shifts = np.exp(-2 * np.pi * 1.0j * (self.u*-dRA + self.v*-dDec))
-		visp = self.vis * shifts
+		visp = self.visp * shifts
 		realp = visp.real
 		imagp = visp.imag
-		wgt = self.wgt
+		if est_weights:
+			wgt = estimate_baseline_dependent_weight(rhop,visp,bin_width)
+		else:
+			wgt = self.wgt
 
 
 
 		# if requested, return a binned (averaged) representation
 		if (bin_width > 0):
 			max_bin=int(np.nanmax(rhop))
-			bins = np.arange(0, max_bin+bin_width*1e3, bin_width*1e3)
+			bins = np.arange(0, max_bin+bin_width, bin_width)
 			avbins = bins       # scale to lambda units (input in klambda)
 			bwid = 0.5 * (avbins[1] - avbins[0])
 			bvis = np.zeros_like(avbins, dtype='complex')
@@ -127,9 +144,9 @@ class vis:
 				inb = np.where((rhop >= avbins[ib] - bwid) & (rhop < avbins[ib] + bwid))
 				if (len(inb[0]) >= 5):
 					bRe, eRemu = np.average(realp[inb], weights=wgt[inb], returned=True)
-					eRese = np.std(realp[inb])
+					eRese = np.std(realp[inb]/np.sqrt(len(inb[0])))
 					bIm, eImmu = np.average(imagp[inb], weights=wgt[inb], returned=True)
-					eImse = np.std(imagp[inb])
+					eImse = np.std(imagp[inb]/np.sqrt(len(inb[0])))
 					bvis[ib] = bRe + 1j*bIm
 					berr_scat[ib] = eRese + 1j*eImse
 					berr_std[ib] = 1 / np.sqrt(eRemu) + 1j / np.sqrt(eImmu)
@@ -144,7 +161,7 @@ class vis:
 
 			return output
 
-		output = realp + 1j*imagp, rhop, 1 / np.sqrt(wgt), 1 / np.sqrt(wgt), np.zeros_like(rhop)
+		output = realp + 1j*imagp, rhop, berr_std, berr_scat
 		return output
 
 	def plot(self,
@@ -194,20 +211,142 @@ class vis:
 		"""
 
 		if ax is None:
-			fig, ax = plt.subplots()
+			fig = plt.figure(figsize=(6, 6))
+			gs = GridSpec(2, 1, height_ratios=[4, 1])
+			ax = plt.subplot(gs[0]), plt.subplot(gs[1])
 		else:
-			fig = ax.figure
+			ax = ax
+
+		assert len(ax) == 2
+		ax_Re, ax_Im = ax
 
 		#deproject and bin visibilities
 		vis, rhop, err_std, err_scat, bins = self.binned_vis(inc, PA, dRA, dDec, bin_width)
 
-		ax.scatter(rhop/1e3, vis.real, **ax_kwargs)
-		ax.axhline(0, linewidth=1, alpha=1, color="k", ls='--')
+		ax_Re.scatter(rhop/1e3, vis.real, **ax_kwargs)
+		ax_Im.scatter(rhop/1e3, vis.imag, **ax_kwargs)
 
 		#errors
 		err = np.sqrt(err_std**2+err_scat**2)/2
 
-		ax.errorbar(rhop/1e3, vis.real, yerr=err, fmt='none')
+		ax_Re.errorbar(rhop/1e3, vis.real, yerr=err_std.real, fmt='none')
+		ax_Im.errorbar(rhop/1e3, vis.imag, yerr=err_std.imag, fmt='none')
+
+		ax_Re.axhline(0, linewidth=1, alpha=1, color="k", ls='--')
+		ax_Im.axhline(0, linewidth=1, alpha=1, color="k", ls='--')
+		ax_Re.figure.subplots_adjust(left=0.25, right=0.97, hspace=0., bottom=0.15, top=0.98)
+
+
+		return ax
+
+	def plot_galario_model(self,
+		inc: float = None,
+		PA: float = None,
+		dRA: float = 0.0,
+		dDec: float = 0.0,
+		bin_width: float = 0.0,
+		model_data: str = None,
+		wle: float = 1.0,
+		ax: ndarray = None,
+		data_kwargs={},
+		model_kwargs={},
+		):
+		"""Plot visibility data.
+
+		Parameters
+		----------
+		inc:
+			Inclination of the disc in degrees.
+		PA:
+			Position angle of the disc in degrees.
+		dRA
+			Right accession offsets in arcseconds.
+		dDec
+			Declination offsets in arcseconds.
+		bins
+			Spacing for binnings the visibilities
+		ax
+			A matplotlib Axes handle.
+		ax_kwargs
+			Keyword arguments to pass to contour map matplotlib Axes.
+		**kwargs
+			Additional keyword arguments to pass to interpolation
+			and matplotlib functions.
+
+		Returns
+		-------
+		ax
+			The matplotlib Axes object.
+
+		Notes
+		-----
+		Any notes?
+
+		Examples
+		--------
+		Put good example here.
+
+		"""
+
+		if ax is None:
+			fig = plt.figure(figsize=(6, 6))
+			gs = GridSpec(2, 1, height_ratios=[4, 1])
+			ax = plt.subplot(gs[0]), plt.subplot(gs[1])
+		else:
+			ax = ax
+
+		if model_data is None:
+			print('Visibilities plotted with no model')
+		else:
+			model_baselines, model_vis = import_galario_model(model_data, wle, bin_width)
+
+
+
+		_kwargs0 = copy(data_kwargs)
+
+		assert len(ax) == 2
+		ax_Re, ax_Im, = ax
+
+		#deproject and bin visibilities
+		vis, rhop, err_std, err_scat, bins = self.binned_vis(inc, PA, dRA, dDec, bin_width)
+
+		c = _kwargs0.pop('color', 'black')
+		data_kwargs.pop('color', None)
+
+		ax_Re.scatter(rhop/1e3, vis.real, color=c, **data_kwargs)
+		ax_Im.scatter(rhop/1e3, vis.imag, color=c, **data_kwargs)
+
+
+		ax_Re.errorbar(model_baselines/1e3, model_vis.real, ls = '-', lw=2, color = 'blueviolet', **model_kwargs)
+		ax_Im.errorbar(model_baselines/1e3, model_vis.imag, ls = '-', lw=2, color = 'blueviolet', **model_kwargs)
+
+		model_real_chi2 = model_vis.real[0:len(vis.real)]
+		model_imag_chi2 = model_vis.imag[0:len(vis.imag)]
+
+		chi2_real = np.sum((vis.real - model_real_chi2)**2/err_std.real)
+		chi2_imag = np.sum((vis.imag - model_imag_chi2)**2/err_std.imag)
+
+		ax_Re.text(0.65, 0.015, s='chi2 ='+str("{:.8f}".format(chi2_real)), transform=ax_Re.transAxes)
+		ax_Im.text(0.65, 0.05, s='chi2 ='+str("{:.8f}".format(chi2_imag)), transform=ax_Im.transAxes)
+
+
+
+		#errors
+		err = np.sqrt(err_std**2+err_scat**2)/2
+
+		ax_Re.errorbar(rhop/1e3, vis.real, yerr=err_std.real, fmt='none', color='k')
+		ax_Im.errorbar(rhop/1e3, vis.imag, yerr=err_std.imag, fmt='none', color='k')
+
+		ax_Re.axhline(0, linewidth=1, alpha=1, color="k", ls='--')
+		ax_Im.axhline(0, linewidth=1, alpha=1, color="k", ls='--')
+		ax_Re.figure.subplots_adjust(left=0.25, right=0.97, hspace=0., bottom=0.15, top=0.98)
+
+		if ax is None:
+			font = 10
+			ax_Re.set_ylabel('Re (Jy)',fontsize=font, fontweight='bold')
+			ax_Im.set_ylabel('Im (Jy)',fontsize=font, fontweight='bold')
+			ax_Im.set_xlabel('Deprojected baseline (kλ)',fontsize=font, fontweight='bold')
+
 
 		return ax
 
@@ -262,17 +401,17 @@ class vis:
 
 		if est_weights == True:
 			baselines = (self.u**2 + self.v**2)**.5
-			weights = estimate_baseline_dependent_weight(baselines, self.vis, bin_width)
+			weights = estimate_baseline_dependent_weight(baselines, self.visp, bin_width)
 		else:
 			weights = self.wgt
 
 		disk_geometry = FixedGeometry(float(inc), float(PA), dRA=dRA, dDec=dDec)
 		FF = FrankFitter(Rmax=Rmax, N=N, geometry=disk_geometry, alpha=alpha, weights_smooth=ws)
 		print('Calculating Frankenstin model')
-		sol = FF.fit(self.u, self.v, self.vis, weights)
+		sol = FF.fit(self.u, self.v, self.visp, weights)
 
 		#Deprojecting
-		u_deproj, v_deproj, vis_deproj = sol.geometry.apply_correction(self.u, self.v, self.vis)
+		u_deproj, v_deproj, vis_deproj = sol.geometry.apply_correction(self.u, self.v, self.visp)
 		baselines = (u_deproj**2 + v_deproj**2)**.5
 
 		#Model grid
@@ -541,7 +680,10 @@ class vis:
 					img = binned_vis.V.imag
 					img_err = binned_vis.error.imag
 
-				log = np.sum((real - vis_model_realbins)**2/real_err)
+				real_log = real#[binned_vis.uv/1e3 < 1000]
+				real_err_log = real_err#[binned_vis.uv/1e3 < 1000]
+				vis_model_realbins = vis_model_realbins#[binned_vis.uv/1e3 < 1000]
+				log = np.sum((real_log - vis_model_realbins)**2/real_err_log)
 
 				if not log:
 					print('Model failed, increase Rmax or maybe N')
@@ -622,7 +764,7 @@ class vis:
 		#Calculating intitial model
 		if est_weights == True:
 			baselines = (self.u**2 + self.v**2)**.5
-			weights = estimate_baseline_dependent_weight(baselines, self.vis, bin_width)
+			weights = estimate_baseline_dependent_weight(baselines, selfp, bin_width)
 		else:
 			weights = self.wgt
 
@@ -630,7 +772,7 @@ class vis:
 		FF = FrankFitter(Rmax=Rmax, N=N, geometry=disk_geometry, alpha=alpha, weights_smooth=ws)
 
 		print('Calculating initial Frankenstin model')
-		sol = FF.fit(self.u, self.v, self.vis, weights)
+		sol = FF.fit(self.u, self.v, self.visp, weights)
 		I_nn = sol.solve_non_negative()
 
 		model_peak = sol.r[I_nn == I_nn.max()]
@@ -649,7 +791,7 @@ class vis:
 		for i in range(0,iters):
 			print(i)
 
-			u_boot, v_boot, vis_boot, wgt_boot = draw_bootstrap_sample(self.u, self.v, self.vis, weights)
+			u_boot, v_boot, vis_boot, wgt_boot = draw_bootstrap_sample(self.u, self.v, self.visp, weights)
 			try:
 				sol_boot = FF.fit(u_boot, v_boot, vis_boot, wgt_boot)
 			except ValueError:
