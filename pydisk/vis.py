@@ -319,12 +319,17 @@ class vis:
 
 		ax_Re.errorbar(model_baselines/1e3, model_vis.real, ls = '-', lw=2, color = 'blueviolet', **model_kwargs)
 		ax_Im.errorbar(model_baselines/1e3, model_vis.imag, ls = '-', lw=2, color = 'blueviolet', **model_kwargs)
+		
+		if len(model_vis.real)>len(vis.real):
+			model_vis.real = model_vis.real[0:len(vis.real)]
+			model_vis.imag = model_vis.imag[0:len(vis.imag)]
+		
+		if len(vis.real)>len(model_vis.real):
+			vis.real = vis.real[0:len(model_vis.real)]
+			vis.imag = vis.imag[0:len(model_vis.imag)]
 
-		model_real_chi2 = model_vis.real[0:len(vis.real)]
-		model_imag_chi2 = model_vis.imag[0:len(vis.imag)]
-
-		chi2_real = np.sum((vis.real - model_real_chi2)**2/err_std.real)
-		chi2_imag = np.sum((vis.imag - model_imag_chi2)**2/err_std.imag)
+		chi2_real = np.sum((vis.real - model_vis.real)**2/err_std.real)
+		chi2_imag = np.sum((vis.imag - model_vis.imag)**2/err_std.imag)
 
 		ax_Re.text(0.65, 0.015, s='chi2 ='+str("{:.8f}".format(chi2_real)), transform=ax_Re.transAxes)
 		ax_Im.text(0.65, 0.05, s='chi2 ='+str("{:.8f}".format(chi2_imag)), transform=ax_Im.transAxes)
