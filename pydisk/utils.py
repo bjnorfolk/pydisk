@@ -91,7 +91,7 @@ def uvdump2ascii(uv_dump, vis_out):
 	uv_data = Table([u, v, w, real, imag, wgt, freq], 
 		names=['u', 'v', 'w', 'real', 'imag', 'wgt', 'freq'])
 
-	if not out:
+	if not vis_out:
 		raise FileNotFoundError('Need to specify an output file')
 
 	ascii.write(uv_data, vis_out, overwrite=True)
