@@ -74,12 +74,12 @@ def Wm2_to_Tb(nuFnu, nu, pixelscale):
 
     return Tb
 
-def uvdump2ascii(vis_fil, out):
+def uvdump2ascii(uv_dump, vis_out):
 	"""Converts a visibility data set exported from uvdump in miriad to an ascii file.
 		vis, visibility txt file
 		out, visibility acsii txt file
 		"""
-	uvdump_file = Table.read(vis_file, format='ascii')
+	uvdump_file = Table.read(uv_dump, format='ascii')
 	u = uvdump_file['col1']
 	v = uvdump_file['col2']
 	w = uvdump_file['col3']
@@ -94,7 +94,7 @@ def uvdump2ascii(vis_fil, out):
 	if not out:
 		raise FileNotFoundError('Need to specify an output file')
 
-	ascii.write(uv_data, out, overwrite=True)
+	ascii.write(uv_data, vis_out, overwrite=True)
 
 	return uv_data
 
