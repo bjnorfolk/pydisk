@@ -331,8 +331,11 @@ class vis:
 			data_chi2_real = vis.real[0:len(model_vis.real)]
 			data_chi2_imag = vis.imag[0:len(model_vis.imag)]
 			
-			chi2_real = np.sum((data_chi2_real - model_vis.real)**2/err_std.real)
-			chi2_imag = np.sum((data_chi2_imag - model_vis.imag)**2/err_std.imag)
+			err_chi2_real = err_std.real[0:len(model_vis.real)]
+			err_chi2_imag = err_std.imag[0:len(model_vis.imag)]
+			
+			chi2_real = np.sum((data_chi2_real - model_vis.real)**2/err_chi2_real)
+			chi2_imag = np.sum((data_chi2_imag - model_vis.imag)**2/err_chi2_imag)
 			
 		if len(vis.real)==len(model_vis.real):
 			chi2_real = np.sum((vis.real - model_vis.real)**2/err_std.real)
