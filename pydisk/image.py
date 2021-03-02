@@ -20,6 +20,8 @@ from astropy.wcs import WCS
 
 from copy import copy
 
+from scipy import constants
+
 from .utils import readfits, getdeg
 
 class image:
@@ -327,7 +329,7 @@ class image:
 			print('Source: ', obj)
 			print('Intergrated flux: ', flux)
 			print('rms: ', rms)
-			print('Freq: ', freq,'GHz - ',c/(freq*1e6), 'mm')
+			print('Freq: ', freq,'GHz - ',constants.c/(freq*1e6), 'mm')
 
 		_kwargs = copy(map_kwargs)
 		cmap = _kwargs.pop('cmap', cmr.heat)
