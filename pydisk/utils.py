@@ -288,5 +288,3 @@ def fwhm_calc(bmaj,dist,re_au=None):
 	print('fwhm error: ', 0.5*fwhm,'arcseconds - ',0.5*fwhm*dist,' AU')
 	if re_au:
 		return 0.5*fwhm*dist
-
-

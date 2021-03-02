@@ -250,6 +250,7 @@ class image:
 		dRA: float = 0.0,
 		dDec: float = 0.0,
 		ax: ndarray = None,
+		int_flux = True,
 		map_kwargs={},
 		contour_kwargs={},
 		colorbar_kwargs={},
@@ -315,6 +316,19 @@ class image:
 		contmap, x, y, rms = self.contour_map(dRA, dDec)
 
 		he = self.he
+
+		if int_flux:
+			obj = he['OBJECT']
+			freq = he['CRVAL3']/1e9
+			rr = np.sqrt(x**2+y**2)
+			w=np.where(contmap>3*rms)			
+			beampix=he['BMAJ']*he['BMIN']/(abs(he['CDELT1'])**2)*np.pi/(4*np.log(2.))
+			flux=np.nansum(contmap[w])/beampix
+			print('Source: ', obj)
+			print('Intergrated flux: ', flux)
+			print('rms: ', rms)
+			print('Freq: ', freq,'GHz - ',c/(freq*1e6), 'mm')
+
 		_kwargs = copy(map_kwargs)
 		cmap = _kwargs.pop('cmap', cmr.heat)
 
@@ -415,7 +429,7 @@ class image:
 			bmpa=90.-he['BPA']
 			bmj = he['BMAJ']
 			bmn = he['BMIN']
-			print('Beam dim: bmj=',bmj/0.000277778,'deg, bmn=',bmn/0.000277778,'deg, pa=', he['BPA'],' deg')
+			print('Beam dim: bmj=',bmj/0.000277778,'as, bmn=',bmn/0.000277778,'as, pa=', he['BPA'],' deg')
 			_kwargs = copy(beam_kwargs)
 			lw = _kwargs.pop('linewidth', '2')
 			clr = _kwargs.pop('edgecolor', 'w')
