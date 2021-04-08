@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Ellipse
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from matplotlib.ticker import FormatStrFormatter
+from matplotlib import ticker
 import cmasher as cmr
 
 from scipy import interpolate
@@ -249,12 +250,17 @@ class image:
 		overlay_dRA: float = 0.0,
 		overlay_dDec: float = 0.0,
 		contours: ndarray = None,
+		contour_overlay2: str = None,
+		overlay2_dRA: float = 0.0,
+		overlay2_dDec: float = 0.0,
+		contours2: ndarray = None,
 		dRA: float = 0.0,
 		dDec: float = 0.0,
 		ax: ndarray = None,
 		int_flux = True,
 		map_kwargs={},
 		contour_kwargs={},
+		contour_kwargs2={},
 		colorbar_kwargs={},
 		star_kwargs={},
 		beam_kwargs={},
@@ -371,12 +377,58 @@ class image:
 			alpha = _kwargs.pop('alpha', 1)
 			color = _kwargs.pop('color', 'w')
 			lw = _kwargs.pop('linewidth', 1)
+			ls = _kwargs.pop('linestyle', '-')
 
 			contour_array = np.array(contours)
 			contours_neg = -1*contour_array
 			levels = np.sort(np.append(contours_neg,contour_array))*rms
 			ax.contour(x,y,contmap,levels, alpha=alpha, linewidths=lw, 
-				colors=color, zorder=2)
+				colors=color, linestyles=ls, zorder=2)
+
+			if contour_overlay2:
+
+				im, he = readfits(contour_overlay2)
+				im[np.isnan(im)]=0.
+				contmap=np.squeeze(im)
+
+				nx, ny = he['NAXIS1'], he['NAXIS2']
+
+				xr = 3600 * he['CDELT1'] * (np.arange(nx) - (he['CRPIX1'] - 1)) - overlay2_dRA
+				yr = 3600 * he['CDELT2'] * (np.arange(ny) - (he['CRPIX2'] - 1)) - overlay2_dDec
+
+				if (xr.shape[0]!=contmap.shape[1]):
+					xr = xr[0:contmap.shape[1]]
+					print('xr array corrected')
+				if (yr.shape[0]!=contmap.shape[0]):
+					yr = yr[0:contmap.shape[0]]
+					print('yr array corrected')
+
+				x, y = np.meshgrid(xr,yr)
+
+				rr = np.sqrt(x**2+y**2)
+
+				#Reshaping if x!=y
+				if (rr.shape!=contmap.shape):
+					rr = rr[0:contmap.shape[0],0:contmap.shape[1]]
+
+				#Ideally the map is larger than the source ... this may be bad
+				radius = 0.5*rr.max()
+
+				w = np.where(rr>radius)
+				rms = np.std(contmap[w])
+
+				_kwargs = copy(contour_kwargs2)
+				alpha = _kwargs.pop('alpha', 1)
+				color = _kwargs.pop('color', 'w')
+				lw = _kwargs.pop('linewidth', 1)
+				ls = _kwargs.pop('linestyle', '-')
+
+				contour_array = np.array(contours2)
+				contours_neg = -1*contour_array
+				levels = np.sort(np.append(contours_neg,contour_array))*rms
+				ax.contour(x,y,contmap,levels, alpha=alpha, linewidths=lw, 
+					colors=color, linestyles=ls, zorder=2)
+
 
 		else:
 			if np.array(contours).any():
@@ -415,6 +467,13 @@ class image:
 			fontsize = __kwargs.pop('cbar_fontsize', '12')
 			fontweight = __kwargs.pop('cbar_fontweight', 'bold')
 			cbar.set_label(label, fontsize=fontsize, fontweight=fontweight)
+			font_size = __kwargs.pop('tick_labelsize', '12')
+			cbar.ax.tick_params(labelsize=font_size)
+			no_ticks = __kwargs.pop('tick_number', '5')
+
+			tick_locator = ticker.MaxNLocator(nbins=no_ticks)
+			cbar.locator = tick_locator
+			cbar.update_ticks()
 
 		if plot_star:
 			_kwargs = copy(star_kwargs)

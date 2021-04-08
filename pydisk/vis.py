@@ -128,7 +128,7 @@ class vis:
 		else:
 			wgt = self.wgt
 
-
+		var = 1/wgt
 
 		# if requested, return a binned (averaged) representation
 		if (bin_width > 0):
@@ -161,7 +161,7 @@ class vis:
 
 			return output
 
-		output = realp + 1j*imagp, rhop, berr_std, berr_scat
+		output = realp + 1j*imagp, rhop, var
 		return output
 
 	def plot(self,
@@ -247,6 +247,8 @@ class vis:
 		bin_width: float = 0.0,
 		model_data: str = None,
 		wle: float = 1.0,
+		k: int = None,
+		chi2: bool = True,
 		ax: ndarray = None,
 		data_kwargs={},
 		model_kwargs={},
@@ -319,30 +321,113 @@ class vis:
 
 		ax_Re.errorbar(model_baselines/1e3, model_vis.real, ls = '-', lw=2, color = 'blueviolet', **model_kwargs)
 		ax_Im.errorbar(model_baselines/1e3, model_vis.imag, ls = '-', lw=2, color = 'blueviolet', **model_kwargs)
-		
-		if len(model_vis.real)>len(vis.real):
-			model_chi2_real = model_vis.real[0:len(vis.real)]
-			model_chi2_imag = model_vis.imag[0:len(vis.imag)]
-			
-			chi2_real = np.sum((vis.real - model_chi2_real)**2/err_std.real)
-			chi2_imag = np.sum((vis.imag - model_chi2_imag)**2/err_std.imag)
-		
-		if len(vis.real)>len(model_vis.real):
-			data_chi2_real = vis.real[0:len(model_vis.real)]
-			data_chi2_imag = vis.imag[0:len(model_vis.imag)]
-			
-			err_chi2_real = err_std.real[0:len(model_vis.real)]
-			err_chi2_imag = err_std.imag[0:len(model_vis.imag)]
-			
-			chi2_real = np.sum((data_chi2_real - model_vis.real)**2/err_chi2_real)
-			chi2_imag = np.sum((data_chi2_imag - model_vis.imag)**2/err_chi2_imag)
-			
-		if len(vis.real)==len(model_vis.real):
-			chi2_real = np.sum((vis.real - model_vis.real)**2/err_std.real)
-			chi2_imag = np.sum((vis.imag - model_vis.imag)**2/err_std.imag)
 
-		ax_Re.text(0.65, 0.015, s='chi2 ='+str("{:.8f}".format(chi2_real)), transform=ax_Re.transAxes)
-		ax_Im.text(0.65, 0.05, s='chi2 ='+str("{:.8f}".format(chi2_imag)), transform=ax_Im.transAxes)
+		if chi2:
+			model_baselines_nobin, model_vis_nobin = import_galario_model(model_data, wle, 0)
+			vis_nobin, rhop_nobin, err_std_nobin = self.binned_vis(inc, PA, dRA, dDec, 0)
+
+			idx   = np.argsort(rhop_nobin)
+			vis_nobin = np.array(vis_nobin)[idx]
+			rhop_nobin = np.array(rhop_nobin)[idx]
+
+			idx   = np.argsort(model_baselines_nobin)
+			model_baselines_nobin = np.array(model_baselines_nobin)[idx]
+			model_vis_nobin = np.array(model_vis_nobin)[idx]
+
+
+			# rhop_nobin = rhop_nobin[np.argsort(rhop_nobin)]
+			# vis_nobin = vis_nobin[rhop_nobin]
+			
+			# model_baselines_nobin = model_baselines_nobin[np.argsort(model_baselines_nobin)]
+			# model_vis_nobin = model_vis_nobin[model_baselines_nobin]
+
+
+			if not k:
+				k = 1
+				print('You need to enter the number of model parameters, I am guessing 1')
+
+			# if len(model_vis.real)>len(vis.real):
+			# 	model_chi2_real = model_vis.real[0:len(vis.real)]
+			# 	model_chi2_imag = model_vis.imag[0:len(vis.imag)]
+			
+			# 	chi2_real = np.log(np.sum((vis.real - model_chi2_real)**2/(2*(err_std.real)**2)))
+			# 	chi2_imag = np.log(np.sum((vis.imag - model_chi2_imag)**2/(2*(err_std.imag)**2)))
+		
+			# if len(vis.real)>len(model_vis.real):
+			# 	data_chi2_real = vis.real[0:len(model_vis.real)]
+			# 	data_chi2_imag = vis.imag[0:len(model_vis.imag)]
+			
+			# 	err_chi2_real = err_std.real[0:len(model_vis.real)]
+			# 	err_chi2_imag = err_std.imag[0:len(model_vis.imag)]
+			
+			# 	chi2_real = np.log(np.sum((data_chi2_real - model_vis.real)**2/(2*(err_chi2_real)**2)))
+			# 	chi2_imag = np.log(np.sum((data_chi2_imag - model_vis.imag)**2/(2*(err_chi2_imag)**2)))
+			
+			# if len(vis.real)==len(model_vis.real):
+
+			# 	chi2_real = np.log(np.sum((vis.real - model_vis.real)**2/(2*(err_std.real)**2)))
+			# 	chi2_imag = np.log(np.sum((vis.imag - model_vis.imag)**2/(2*(err_std.imag)**2)))
+
+			# if len(model_vis.real)>len(vis.real):
+			# 	model_chi2_real = model_vis.real[0:len(vis.real)]
+			# 	model_chi2_imag = model_vis.imag[0:len(vis.imag)]
+			
+			# 	chi2_real = np.log(len(vis_nobin.real))*k + 2*np.log(np.sum((vis.real - model_chi2_real)**2/(2*(err_std.real)**2)))
+			# 	chi2_imag = np.log(len(vis_nobin.imag))*k + 2*np.log(np.sum((vis.imag - model_chi2_imag)**2/(2*(err_std.imag)**2)))
+		
+			# if len(vis.real)>len(model_vis.real):
+			# 	data_chi2_real = vis.real[0:len(model_vis.real)]
+			# 	data_chi2_imag = vis.imag[0:len(model_vis.imag)]
+			
+			# 	err_chi2_real = err_std.real[0:len(model_vis.real)]
+			# 	err_chi2_imag = err_std.imag[0:len(model_vis.imag)]
+			
+			# 	chi2_real = np.log(len(vis_nobin.real))*k + 2*np.log(np.sum((data_chi2_real - model_vis.real)**2/(2*(err_chi2_real)**2)))
+			# 	chi2_imag = np.log(len(vis_nobin.real))*k + 2*np.log(np.sum((data_chi2_imag - model_vis.imag)**2/(2*(err_chi2_imag)**2)))
+			
+			# if len(vis.real)==len(model_vis.real):
+
+			# 	chi2_real = np.log(len(vis_nobin.real))*k + 2*np.log(np.sum((vis.real - model_vis.real)**2/(2*(err_std.real)**2)))
+			# 	chi2_imag = np.log(len(vis_nobin.imag))*k + 2*np.log(np.sum((vis.imag - model_vis.imag)**2/(2*(err_std.imag)**2)))
+
+			# if len(model_vis.real)>len(vis_nobin.real):
+			# 	model_chi2_real = model_vis_nobin.real[0:len(vis_nobin.real)]
+			# 	model_chi2_imag = model_vis_nobin.imag[0:len(vis_nobin.imag)]
+			
+			# 	chi2_real = np.log(len(vis_nobin.real))*k + 2*np.log(np.sum((vis_nobin.real - model_chi2_real)**2/(2*(err_std_nobin)**2)))
+			# 	chi2_imag = np.log(len(vis_nobin.imag))*k + 2*np.log(np.sum((vis_nobin.imag - model_chi2_imag)**2/(2*(err_std_nobin)**2)))
+		
+			# if len(vis_nobin.real)>len(model_vis_nobin.real):
+			# 	data_chi2_real = vis_nobin.real[0:len(model_vis_nobin.real)]
+			# 	data_chi2_imag = vis_nobin.imag[0:len(model_vis_nobin.imag)]
+			
+			# 	err_chi2_real = err_std_nobin[0:len(model_vis_nobin.real)]
+			# 	err_chi2_imag = err_std_nobin[0:len(model_vis_nobin.imag)]
+			
+			# 	chi2_real = np.log(len(data_chi2_real))*k + 2*np.log(np.sum((data_chi2_real - model_vis_nobin.real)**2/(2*(err_chi2_real)**2)))
+			# 	chi2_imag = np.log(len(data_chi2_imag))*k + 2*np.log(np.sum((data_chi2_imag - model_vis_nobin.imag)**2/(2*(err_chi2_imag )**2)))
+			
+			# if len(vis_nobin.real)==len(model_vis_nobin.real):
+
+			chi2_real = np.log(len(vis_nobin.real))*k + 2*np.log(np.sum((vis_nobin.real - model_vis_nobin.real)**2/(2*(err_std_nobin)**2)))
+			chi2_imag = np.log(len(vis_nobin.imag))*k + 2*np.log(np.sum((vis_nobin.imag - model_vis_nobin.imag)**2/(2*(err_std_nobin)**2)))
+			# print(np.log(len(vis_nobin.real))*k)
+			# print(2*np.log(np.sum((vis_nobin.real - model_vis_nobin.real)**2/(2*(err_std_nobin)**2))))
+			# print(np.sum((vis_nobin.real - model_vis_nobin.real)**2/(2*(err_std_nobin)**2)))
+			# print(vis_nobin.real)
+			# print(np.mean(vis_nobin.real))
+			# print(model_vis_nobin.real)
+			# print(np.mean(model_vis_nobin.real))
+			# print(err_std_nobin)
+			# print(np.mean(err_std_nobin))
+			# print((vis_nobin.real - model_vis_nobin.real)**2/(2*(err_std_nobin)**2))
+			# print(np.mean((vis_nobin.real - model_vis_nobin.real)**2/(2*(err_std_nobin)**2)))
+			# print(rhop_nobin)
+			# print(model_baselines_nobin)
+			#chi2_real = np.log(len(vis_nobin.real))*k - 2*np.sum((np.sqrt(vis_nobin.real**2+vis_nobin.imag**2) - np.sqrt(model_vis_nobin.real**2+model_vis_nobin.imag**2))**2/(2*(err_std_nobin)**2))
+
+			ax_Re.text(0.75, 0.015, s='BIC ='+str("{:.2f}".format(chi2_real)), transform=ax_Re.transAxes)
+			ax_Im.text(0.75, 0.05, s='BIC ='+str("{:.2f}".format(chi2_imag)), transform=ax_Im.transAxes)
 
 
 
