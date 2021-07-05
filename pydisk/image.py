@@ -256,6 +256,7 @@ class image:
 		contours2: ndarray = None,
 		dRA: float = 0.0,
 		dDec: float = 0.0,
+		custom_rms: float = None,
 		ax: ndarray = None,
 		int_flux = True,
 		map_kwargs={},
@@ -381,6 +382,10 @@ class image:
 
 			contour_array = np.array(contours)
 			contours_neg = -1*contour_array
+			if custom_rms:
+				rms_map = float(custom_rms)
+			else:
+				rms_map = rms
 			levels = np.sort(np.append(contours_neg,contour_array))*rms
 			ax.contour(x,y,contmap,levels, alpha=alpha, linewidths=lw, 
 				colors=color, linestyles=ls, zorder=2)
@@ -437,11 +442,11 @@ class image:
 				color = _kwargs.pop('color', 'w')
 				lw = _kwargs.pop('linewidth', 1)
 
-			contour_array = np.array(contours)
-			contours_neg = -1*contour_array
-			levels = np.sort(np.append(contours_neg,contour_array))*rms
-			ax.contour(x,y,contmap,levels, alpha=alpha, linewidths=lw, 
-				colors=color, zorder=2)
+				contour_array = np.array(contours)
+				contours_neg = -1*contour_array
+				levels = np.sort(np.append(contours_neg,contour_array))*rms
+				ax.contour(x,y,contmap,levels, alpha=alpha, linewidths=lw, 
+					colors=color, zorder=2)
 
 		#colorbar
 		if show_colorbar:
