@@ -3,6 +3,7 @@ import numpy as np
 from astropy.io import fits
 from astropy.table import Table
 from astropy.io import ascii
+import scipy.constants as sc
 
 from frank.utilities import UVDataBinner
 
@@ -28,20 +29,18 @@ def Jy_to_Wm2(Fnu, nu):
     return 1e-26 * Fnu * nu
 
 def Jybeam_to_Tb(Fnu, nu, bmaj, bmin):
-    '''
-     Convert Flux density in Jy/beam to brightness temperature [K]
-     Flux [Jy]
-     nu [Hz]
-     bmaj, bmin in [arcsec]
-     T [K]
-    '''
+    """Convert flux converted from Jy/beam to K using full Planck law."""
+    im2 = np.nan_to_num(Fnu)
+
     beam_area = bmin * bmaj * arcsec ** 2 * np.pi / (4.0 * np.log(2.0))
-    exp_m1 = 1e26 * beam_area * 2.0 * sc.h / sc.c ** 2 * nu ** 3 / Fnu
-    hnu_kT = np.log1p(np.maximum(exp_m1, 1e-10))
 
-    Tb = sc.h * nu / (hnu_kT * sc.k)
+    exp_m1 = 1e26 * beam_area * 2.0 * sc.h * nu ** 3 / (sc.c ** 2 * abs(im2))
 
-    return Tb
+    hnu_kT = np.log1p(exp_m1 + 1e-10)
+    Tb = sc.h * nu / (sc.k * hnu_kT)
+
+    return np.ma.where(im2 >= 0.0, Tb, -Tb)
+
 
 def Jy_to_Tb(Fnu, nu, pixelscale):
     '''

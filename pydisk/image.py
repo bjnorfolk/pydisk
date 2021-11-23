@@ -12,18 +12,19 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 from matplotlib.ticker import FormatStrFormatter
 from matplotlib import ticker
 import cmasher as cmr
+from matplotlib.colors import TwoSlopeNorm
 
 from scipy import interpolate
+from scipy import constants
 
 from pathlib import Path
 
 from astropy.wcs import WCS
+from astropy.visualization import (AsinhStretch, LogStretch, LinearStretch, ImageNormalize)
 
 from copy import copy
 
-from scipy import constants
-
-from .utils import readfits, getdeg
+from .utils import readfits, getdeg, Jybeam_to_Tb
 
 class image:
 	"""Image FITS object.
@@ -120,6 +121,57 @@ class image:
 
 		return contmap, x, y, rms
 
+	def contour_map_bad_fits(self,
+		dRA: float = 0.0,
+		dDec: float = 0.0,
+		pixel_size: float = None,
+		):
+		"""Makes a contour map.
+
+		Parameters
+		----------
+		dRA
+			Right accession offsets in arcseconds.
+		dDec
+			Declination offsets in arcseconds.
+		pixel_size
+			Pixel scale given in arcsecond/pixel.
+
+		Returns
+		-------
+		im
+			The contourmap.
+		x
+			The x component of the contourmap.
+		y
+			The y component of the contourmap.
+		"""
+		#reading in fits
+		# self._read()
+
+		im = self.im
+		im[np.isnan(im)]=0.
+		contmap=np.squeeze(im)
+
+		he = self.he
+
+		nx, ny = he['NAXIS1'], he['NAXIS2']
+
+		xr = pixel_size * (np.arange(nx) - ((nx/2) - 1)) - dRA
+		yr = pixel_size * (np.arange(ny) - ((ny/2) - 1)) - dDec
+
+		if (xr.shape[0]!=contmap.shape[1]):
+			xr = xr[0:contmap.shape[1]]
+			print('xr array corrected')
+		if (yr.shape[0]!=contmap.shape[0]):
+			yr = yr[0:contmap.shape[0]]
+			print('yr array corrected')
+
+		x, y = np.meshgrid(-xr,yr)
+
+
+		return contmap, x, y
+
 	def radial_profile(self,
 		inc: float = None,
 		PA: float = None,
@@ -127,6 +179,7 @@ class image:
 		dDec: float = 0.0,
 		rbins: ndarray = None,
 		tbins: ndarray = None,
+		rotate_map: float = None,
 		):
 		"""Calculates the radial profile of a contour map.
 
@@ -168,16 +221,23 @@ class image:
 		xp = (x * np.cos(PAr) - y * np.sin(PAr)) / np.cos(incr)
 		yp = (x * np.sin(PAr) + y * np.cos(PAr))
 
+		if rotate_map:
+			ang = np.radians(rotate_map)
+			x_rot = xp
+			y_rot = yp
+			xp =  x_rot* np.cos(ang) - y_rot * np.sin(ang)
+			yp =  x_rot * np.sin(ang) + y_rot * np.cos(ang)
+
 		# now convert to polar coordinates (r in arcseconds, theta in degrees)
 		# note that theta starts along the minor axis (theta = 0), and rotates clockwise in the sky plane)
 		r = np.sqrt(xp**2 + yp**2)
 		theta = np.degrees(np.arctan2(yp, xp))
 
 		# radius and azimuth bin centers (and their widths)
-		if not rbins:
+		if rbins is None:
 			rbins = np.linspace(0.0005, 1.5, 3000)	# in arcseconds
-		if not tbins:
-			tbins = np.linspace(-180, 180, 181)     # in degrees
+		if tbins is None:
+			tbins = np.linspace(-180, 180, 361)     # in degrees
 
 		dr = np.abs(rbins[1] - rbins[0])
 		dt = np.abs(tbins[1] - tbins[0])
@@ -214,6 +274,7 @@ class image:
 		j = 0
 		#fixing placeholder
 		for i in range(len(rbins)):
+			#j=i
 			# extract an azimuthal slice of the (r, az)-map
 			az_slice = rtmap[:,j]
 			# identify if there's missing information in an az bin along that slice:
@@ -221,27 +282,28 @@ class image:
 			if np.any(az_slice < -1e5):
 				# extract non-problematic bins in the slice
 				x_slice, y_slice = tbins[az_slice >= -1e5], az_slice[az_slice >= -1e5]
-				if np.array(x_slice).any() and np.array(y_slice).any():
+				# if np.array(x_slice).any() and np.array(y_slice).any():
 
-					# pad the arrays to make sure they span a full circle in azimuth
-					x_slice_ext = np.pad(x_slice, 1, mode='constant')
-					x_slice_ext[0] -= 360.
-					x_slice_ext[-1] += 360.
-					y_slice_ext = np.pad(y_slice, 1, mode='constant')
+				# pad the arrays to make sure they span a full circle in azimuth
+				x_slice_ext = np.pad(x_slice, 1, mode='constant')
+				x_slice_ext[0] -= 360.
+				x_slice_ext[-1] += 360.
+				y_slice_ext = np.pad(y_slice, 1, mode='constant')
 
-					# define the interpolation function
-					raz_func = interpolate.interp1d(x_slice_ext, y_slice_ext, bounds_error=True)
+				# define the interpolation function
+				raz_func = interpolate.interp1d(x_slice_ext, y_slice_ext, bounds_error=True)
 
-					# interpolate and replace those bins in the (r, az)-map
-					fixed_slice = raz_func(tbins)
-					rtmap[:,j] = fixed_slice
-					j = j+1
-				else:
-					rtmap = np.delete(rtmap, i, axis=1)
-					j = j -1
+				# interpolate and replace those bins in the (r, az)-map
+				fixed_slice = raz_func(tbins)
+				rtmap[:,j] = fixed_slice
+				j = j+1
+				# else:
+				# 	rtmap = np.delete(rtmap, i, axis=1)
+				# 	rbins = np.delete(rbins, i)
+				# 	j = j-1
 
 
-		return rbins, SBr, err_SBr, rtmap
+		return rbins, tbins, SBr, err_SBr, rtmap
 
 	def plot_map(self,
 		plot_star: bool = False,
@@ -259,6 +321,7 @@ class image:
 		custom_rms: float = None,
 		ax: ndarray = None,
 		int_flux = True,
+		Tb: bool = False,
 		map_kwargs={},
 		contour_kwargs={},
 		contour_kwargs2={},
@@ -340,8 +403,14 @@ class image:
 
 		_kwargs = copy(map_kwargs)
 		cmap = _kwargs.pop('cmap', cmr.heat)
+		levels = _kwargs.pop('levels', 1000)
 
-		contf = ax.contourf(x, y, contmap*10**3, levels=1000, cmap=cmap, zorder= 1)
+		if Tb:
+			print('Converting scale to temperature')
+			contmap = Jybeam_to_Tb(Fnu=contmap, nu=he['CRVAL3'], bmaj=he['BMAJ']/0.000277778, bmin=he['BMIN']/0.000277778)
+			contf = ax.contourf(x, y, contmap, levels=levels, cmap=cmap, zorder= 1, **_kwargs)
+		else:
+			contf = ax.contourf(x, y, contmap*10**3, levels=levels, cmap=cmap, zorder= 1, **_kwargs)
 
 		if contour_overlay:
 			im, he = readfits(contour_overlay)
@@ -444,14 +513,18 @@ class image:
 
 				contour_array = np.array(contours)
 				contours_neg = -1*contour_array
-				levels = np.sort(np.append(contours_neg,contour_array))*rms
+				levels = np.sort(np.append(contours_neg,contour_array))
 				ax.contour(x,y,contmap,levels, alpha=alpha, linewidths=lw, 
 					colors=color, zorder=2)
 
 		#colorbar
 		if show_colorbar:
 			_kwargs = copy(colorbar_kwargs)
-			label = _kwargs.pop('label', 'mJy/beam')
+			if Tb:
+				label = _kwargs.pop('label', r'$T_b (K)$')
+			else:
+				label = _kwargs.pop('label', 'mJy/beam')
+			
 			position = _kwargs.pop('position', 'right')
 			size = _kwargs.pop('size', '5%')
 			pad = _kwargs.pop('pad', '2%')
@@ -577,7 +650,7 @@ class image:
 
 
 		#produce contour map from fits file
-		rbins, SBr, err_SBr, rtmap = self.radial_profile(inc, PA, dRA, dDec, rbins, tbins)
+		rbins, tbins, SBr, err_SBr, rtmap = self.radial_profile(inc, PA, dRA, dDec, rbins, tbins)
 
 		# SBr = SBr*4.25e10
 		bmj = 3600 *self.he['BMAJ']
@@ -622,20 +695,67 @@ class image:
 
 		return ax
 
-	def plot_radialprofile(self,
-		plot_beam: bool = True,
+	def plot_rphi_map(self,
 		contours: ndarray = None,
 		inc: float = None,
 		PA: float = None,
 		dRA: float = 0.0,
 		dDec: float = 0.0,
 		ax: ndarray = None,
+		Tb: bool = False,
+		asinh_scale: bool= False,
+		log_scale: bool= False,
+		rbins: ndarray = None,
+		tbins: ndarray = None,
+		sr: bool = False,
+		radial_xaxis: bool = True,
+		rotate_map: float = None,
 		map_kwargs={},
 		contour_kwargs={},
 		colorbar_kwargs={},
 		beam_kwargs={},
+		norm_kwargs ={},
 		kwargs={},
 		):
+
+		if ax is None:
+			fig, ax = plt.subplots()
+		else:
+			fig = ax.figure
+
+		__kwargs = copy(kwargs)
+
+		_kwargs = copy(map_kwargs)
+		cmap = _kwargs.pop('cmap', cmr.heat)
+		levels = _kwargs.pop('levels', 1000)
+
+		show_colorbar = __kwargs.pop('show_colorbar', False)
+
+		rbins, tbins, SBr, err_SBr, rtmap = self.radial_profile(inc, PA, dRA, dDec, rbins, tbins, rotate_map)
+
+		rtmap_bounds = (rbins.min(), rbins.max(), tbins.min(), tbins.max())
+
+		vmin = _kwargs.pop('vmin', rtmap.min())
+
+		vmax = _kwargs.pop('vmax', rtmap.max())
+
+		if radial_xaxis:
+			x=rbins
+			y=tbins
+		else:
+			x=tbins
+			y=rbins
+			rtmap = np.transpose(rtmap)
+
+		if Tb:
+			print('Converting scale to temperature')
+			rtmap = Jybeam_to_Tb(Fnu=rtmap, nu=self.he['CRVAL3'], bmaj=self.he['BMAJ']/0.000277778, bmin=self.he['BMIN']/0.000277778)
+			contf = ax.contourf(x, y, rtmap, cmap=cmap, levels=levels, aspect='auto', **_kwargs)
+		else:
+			contf = ax.contourf(x, y, 1e3*rtmap, cmap=cmap, levels=levels, aspect='auto', **_kwargs)
+
+
+		
 
 		if contours:
 			_kwargs = copy(contour_kwargs)
@@ -645,23 +765,32 @@ class image:
 
 			contour_array = np.array(contours)
 			contours_neg = -1*contour_array
-			levels = np.sort(np.append(contours_neg,contour_array))*rms
-			ax.contour(x,y,contmap,levels, alpha=alpha, linewidths=lw, 
-				colors=color, zorder=2)
+			levels = np.sort(np.append(contours_neg,contour_array))
+			ax.contour(x,y,rtmap,levels, alpha=alpha, linewidths=lw, 
+				colors=color, zorder=2, **_kwargs)
 
-		#colorbar
+		# #colorbar
+		# if show_colorbar:
+		# 	cb = plt.colorbar(im, ax=ax, pad=0.05)
+		# 	cb.set_label('surface brightness [mJy / beam]', rotation=270, labelpad=17)
+
 		if show_colorbar:
 			_kwargs = copy(colorbar_kwargs)
-			label = _kwargs.pop('label', 'mJy/beam')
+			if Tb:
+				label = _kwargs.pop('label', r'$T_K$')
+			else:
+				label = _kwargs.pop('label', 'mJy/beam')
+			
 			position = _kwargs.pop('position', 'right')
 			size = _kwargs.pop('size', '5%')
 			pad = _kwargs.pop('pad', '2%')
+			aspect = _kwargs.pop('aspect', 12)
 			if position in ('top', 'bottom'):
 				_kwargs.update({'orientation': 'horizontal'})
 				pad = _kwargs.pop('pad', '6%')
 
 			divider = make_axes_locatable(ax)
-			cax = divider.append_axes(position=position, size=size, pad=pad)
+			cax = divider.append_axes(position=position, size=size, pad=pad, aspect=aspect)
 			cbar = plt.colorbar(contf, cax, **_kwargs)
 			if position in ('top', 'bottom'):
 				cbar.ax.tick_params(axis='x', top=True, bottom=False, 
@@ -670,30 +799,38 @@ class image:
 			else:
 				cbar.ax.yaxis.set_major_formatter(FormatStrFormatter('%.2f'))
 
-			fontsize = kwargs.pop('cbar_fontsize', '12')
-			fontweight = kwargs.pop('cbar_fontweight', 'bold')
-			cbar.set_label(label, fontsize=fontsize, fontweight=fontweight)
+			fontsize = __kwargs.pop('cbar_fontsize', '12')
+			fontweight = __kwargs.pop('cbar_fontweight', 'bold')
+			rotation = __kwargs.pop('rotation', 270)
+			labelpad = __kwargs.pop('labelpad', 5)
+			cbar.set_label(label, fontsize=fontsize, fontweight=fontweight, rotation=rotation, labelpad=labelpad)
+			font_size = __kwargs.pop('tick_labelsize', '12')
+			cbar.ax.tick_params(labelsize=font_size)
+			no_ticks = __kwargs.pop('tick_number', '5')
 
+			tick_locator = ticker.MaxNLocator(nbins=no_ticks)
+			cbar.locator = tick_locator
+			cbar.update_ticks()
 
-		if plot_beam:
-			bmpa=90.-he['BPA']
-			bmj = he['BMAJ']
-			bmn = he['BMIN']
-			_kwargs = copy(beam_kwargs)
-			lw = _kwargs.pop('linewidth', '2')
-			clr = _kwargs.pop('edgecolor', 'w')
-			beam_pos = _kwargs.pop('beam_pos', '2')
+		# if plot_beam:
+		# 	bmpa=90.-he['BPA']
+		# 	bmj = he['BMAJ']
+		# 	bmn = he['BMIN']
+		# 	_kwargs = copy(beam_kwargs)
+		# 	lw = _kwargs.pop('linewidth', '2')
+		# 	clr = _kwargs.pop('edgecolor', 'w')
+		# 	beam_pos = _kwargs.pop('beam_pos', '2')
 
-			ell=Ellipse(xy=(0.7*float(beam_pos),-0.7*float(beam_pos)), 
-				width=bmj*3600., height=bmn*3600., angle=bmpa, 
-				edgecolor=clr, hatch='\\\\\\', fc='None',linewidth=lw, 
-				zorder=5)
-			ell1=Ellipse(xy=(0.7*float(beam_pos),-0.7*float(beam_pos)), 
-				width=bmj*3600., height=bmn*3600., angle=bmpa, 
-				edgecolor=clr, hatch='////', fc='None',linewidth=lw, 
-				zorder=5)
-			ax.add_patch(ell)
-			ax.add_patch(ell1)
+		# 	ell=Ellipse(xy=(0.7*float(beam_pos),-0.7*float(beam_pos)), 
+		# 		width=bmj*3600., height=bmn*3600., angle=bmpa, 
+		# 		edgecolor=clr, hatch='\\\\\\', fc='None',linewidth=lw, 
+		# 		zorder=5)
+		# 	ell1=Ellipse(xy=(0.7*float(beam_pos),-0.7*float(beam_pos)), 
+		# 		width=bmj*3600., height=bmn*3600., angle=bmpa, 
+		# 		edgecolor=clr, hatch='////', fc='None',linewidth=lw, 
+		# 		zorder=5)
+		# 	ax.add_patch(ell)
+		# 	ax.add_patch(ell1)
 
 
 
